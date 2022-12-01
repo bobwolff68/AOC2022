@@ -1,0 +1,310 @@
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include "stdio.h"
+#include <string>
+#include <vector>
+#include <assert.h>
+
+#include "robotask.h"
+
+using namespace std;
+
+bool ingestStrings(const char* fname, std::vector<std::string>& inputList) {
+  char str[20];
+  FILE* fp = fopen(fname, "r");
+
+  if (!fp)
+    return false;
+
+  inputList.clear();
+
+  while(1) {
+    if (EOF==fscanf(fp, "%s\n", str)) {
+      printf("Read a total of %lu entries.\n", inputList.size());
+      fclose(fp);
+      return true;
+    }
+      
+    inputList.push_back(str);
+    if (inputList.size() % 100 == 0)
+      printf("Another 100 entries read...size is: %lu\n", inputList.size());
+  }
+
+}
+
+bool ingestInts(const char* fname, std::vector<uint32_t>& inputList) {
+  uint32_t tmp;
+  FILE* fp = fopen(fname, "r");
+
+  if (!fp)
+    return false;
+
+  inputList.clear();
+
+  while(1) {
+    if (EOF==fscanf(fp, "%u\n", &tmp)) {
+      printf("Read a total of %lu entries.\n", inputList.size());
+      fclose(fp);
+      return true;
+    }
+      
+    inputList.push_back(tmp);
+    if (inputList.size() % 100 == 0)
+      printf("Another 100 entries read...size is: %lu\n", inputList.size());
+  }
+
+}
+
+bool ingestStringInt(const char* fname, std::vector<std::string>& inputCmds, std::vector<uint32_t>& inputInts) {
+  uint32_t tmp;
+  char cmd[10];
+  FILE* fp = fopen(fname, "r");
+
+  if (!fp)
+    return false;
+
+  inputInts.clear();
+  inputCmds.clear();
+
+  while(1) {
+    if (EOF==fscanf(fp, "%s %u\n", cmd, &tmp)) {
+      printf("Read a total of %lu entries.\n", inputInts.size());
+      fclose(fp);
+      return true;
+    }
+      
+    inputCmds.push_back(cmd);
+    inputInts.push_back(tmp);
+    if (inputInts.size() % 100 == 0)
+      printf("Another 100 entries read...size is: %lu\n", inputInts.size());
+  }
+
+}
+
+void slidingIncreases(std::vector<uint32_t>& values) {
+  uint32_t prevSum, curSum;
+  int increases=0;
+
+  prevSum = values[0] + values[1] + values[2];
+
+  for (int i=3; i<values.size(); i++) {
+    curSum = values[i] + values[i-1] + values[i-2];
+    if (curSum > prevSum)
+      increases++;
+    prevSum = curSum;
+  }
+
+  printf("Total number of sliding window increases is: %u\n", increases);
+}
+
+void increases(std::vector<uint32_t>& values) {
+  int incr=0;
+
+  for (int i=1; i<values.size(); i++) {
+    if (values[i] > values[i-1])
+      incr++;
+  }
+
+  printf("Total number of increases on %lu entries is %d\n", values.size(), incr);
+}
+
+void sift(int column, vector<string>& inList, vector<string>& theOnes, vector<string>& theZeros, int& numOnes) {
+  numOnes=0;
+  theOnes.clear();
+  theZeros.clear();
+  for (int i=0; i<inList.size(); i++) {
+    if (inList[i][column] == '1') {
+      theOnes.push_back(inList[i]);
+      numOnes++;
+    }
+    else {
+      theZeros.push_back(inList[i]);
+    }
+  }
+}
+
+void day3() {
+  std::vector<std::string> rawInputs;
+  int ones[20];
+
+  if (!ingestStrings("day3-2021.input", rawInputs))
+  {
+    printf("Failed to read binary string file.\n");
+    exit(1);
+  }
+
+  for (int i=0;i<20;i++)
+    ones[i] = 0;
+
+  int binlen=rawInputs[0].length();
+
+  for (int i=0; i<rawInputs.size(); i++) {
+    assert(rawInputs[i].length() == binlen);
+
+    for (int scan=0; scan<rawInputs[i].length(); scan++) {
+      // Ripping across the string LEFT to RIGHT
+      ones[scan] += rawInputs[i][scan] == '1';
+    }
+  }
+
+  printf("Out of %lu entries, left-to-right number of ones is:\n", rawInputs.size());
+  for (auto i=0; i<binlen; i++)
+    printf("  # ones in column %d is %d\n", i, ones[i]);
+  
+  std::string binaryStr="";
+
+  printf("Gamma (highest ones) is: ");
+  for (auto i=0; i<binlen; i++) {
+    if (ones[i] > rawInputs.size()/2)
+      binaryStr += "1";
+    else
+      binaryStr += "0";
+    // if (ones[i] > rawInputs.size()/2)
+    //   printf("1");
+    // else
+    //   printf("0");
+  }
+  int gamma = strtoul(binaryStr.c_str(), NULL, 2);
+  printf("  Str: %s, Value: %d\n", binaryStr.c_str(), gamma);
+
+  binaryStr="";
+  printf("\nEpsilon (least ones) is: ");
+  for (auto i=0; i<binlen; i++) {
+    if (ones[i] < rawInputs.size()/2)
+      binaryStr += "1";
+    else
+      binaryStr += "0";
+  }
+  int epsilon = strtoul(binaryStr.c_str(), NULL, 2);
+  printf("  Str: %s, Value: %d\n", binaryStr.c_str(), epsilon);
+
+  printf("Product = %d\n", gamma*epsilon);
+
+  //
+  // Part 2 of day 3
+  //
+
+  // Calculate O2 rating
+  // Keep the entries who have the most bits. In a tie, keep the '1' entries
+  std::vector<std::string> theOnes;
+  std::vector<std::string> theZeros;
+  vector<string> theInput = rawInputs;
+  int numOnes=0;
+  for (int column=0; column<12; column++) {
+    theOnes.clear();
+    theZeros.clear();
+    numOnes = 0;
+    sift(column, theInput, theOnes, theZeros, numOnes);
+    if (numOnes >= theInput.size()/2)
+      theInput = theOnes;
+    else
+      theInput = theZeros;
+    
+    if (theInput.size() == 1) {
+      printf("Found O2 result at column %d\n", column);
+      break;
+    }
+  }
+  int O2Rating = strtoul(theInput[0].c_str(), NULL, 2);
+
+  theOnes.clear();
+  theZeros.clear();
+  theInput = rawInputs;
+  numOnes = 0;
+  int numZeros = 0;
+  for (int column=0; column<12; column++) {
+    theOnes.clear();
+    theZeros.clear();
+    numOnes = 0;
+    sift(column, theInput, theOnes, theZeros, numOnes);
+    numZeros = theInput.size() - numOnes;
+    if (numZeros >= theInput.size()/2)
+      theInput = theZeros;
+    else
+      theInput = theOnes;
+    
+    if (theInput.size() == 1) {
+      printf("Found CO2 result at column %d\n", column);
+      break;
+    }
+  }
+  int CO2Rating = strtoul(theInput[0].c_str(), NULL, 2);
+
+  printf("O2Rating: %d, CO2Rating: %d, Product: %d\n", O2Rating, CO2Rating, O2Rating*CO2Rating);
+}
+
+void day2() {
+  std::vector<std::string> cmds;
+  std::vector<uint32_t> values;
+
+  if (!ingestStringInt("day2-2021.input", cmds, values))
+  {
+    printf("Failed to read command/int file.\n");
+    exit(1);
+  }
+
+  int horiz = 0;
+  int depth = 0;
+
+  for (int i=0; i<cmds.size(); i++) {
+    if (cmds[i]=="forward")
+      horiz += values[i];
+    else if (cmds[i] == "up")
+      depth -= values[i];
+    else if (cmds[i] == "down")
+      depth += values[i];
+    else
+      printf("Bad command? At index=%d, CMD=%s\n", i, cmds[i].c_str());
+  }
+
+  printf("Day 2 part 1 - horiz=%d, depth=%d, product=%d\n", horiz, depth, horiz*depth);
+
+  ///
+  ///
+
+  horiz = 0;
+  depth = 0;
+  int aim = 0;
+
+  for (int i=0; i<cmds.size(); i++) {
+    if (cmds[i]=="forward") {
+      horiz += values[i];
+      depth = depth + (aim * values[i]);
+    }
+    else if (cmds[i] == "up")
+      aim -= values[i];
+    else if (cmds[i] == "down")
+      aim += values[i];
+    else
+      printf("Bad command? At index=%d, CMD=%s\n", i, cmds[i].c_str());
+  }
+
+  printf("Day 2 part 2 - horiz=%d, depth=%d, aim=%d, product=%d\n", horiz, depth, aim, horiz*depth);
+}
+
+void day1() {
+  std::vector<uint32_t> values;
+  if (!ingestInts("day1-2021.input", values))
+    printf("Failed file input reading.\n");
+
+  unsigned long sz = values.size();
+  printf("Last 3 entries are: %u, %u, %u\n", values[sz-3], values[sz-2], values[sz-1]);
+
+  //increases(values)
+  slidingIncreases(values);
+}
+
+int main(int argc, char** argv) {
+  printf("Hello world.\n");
+
+  day3();
+exit(0);
+
+  // for (int i=0; i<values.size(); i++) {
+  //   if (i % 16 == 0)
+  //     printf("\n%5d: ", i);
+  //   printf("%5u ", values[i]);
+  // }
+}
+
