@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
+#include <queue>
 #include <assert.h>
 
 using namespace std;
@@ -226,6 +228,17 @@ void initStackWithChar(stack<char>& theStack, vector<char>& theChars) {
 void initStackWithStrings(stack<string>& theStack, vector<string>& theStrings) {
   for (auto i=0; i<theStrings.size(); i++)
     theStack.push(theStrings[i]);
+}
+
+bool uniqueVector(vector<char> inVec) {
+  sort(inVec.begin(), inVec.end());
+  auto it = std::unique(inVec.begin(), inVec.end());
+  return (it==inVec.end());
+}
+
+bool uniqueVectorUsingSet(vector<char> inVec) {
+  std::set<char> st(inVec.begin(), inVec.end());
+  return (inVec.size() == st.size());
 }
 
 void testInitStack() {
@@ -475,8 +488,10 @@ void day5() {
  1   2   3   4   5   6   7   8   9 
 */
 
+// Only 9 stacks but they are labeled 1-9 so not using '0'
   std::stack<char> crates[10];
 
+// Setup the crate stacks manually rather than parsing
   crates[9].push('N');
   crates[9].push('C');
   crates[9].push('R');
@@ -576,11 +591,62 @@ void day5() {
     printf("\n");
 }
 
+void day6() {
+  vector<string> rawInput;
+  ingestLines("day6.input", rawInput);
+
+  int tally=0;
+
+  vector<int> allInts;
+
+  int quantity, from, to;
+
+// four chars all different
+  vector<char> q;
+
+//const int startSize=4;
+const int startSize=14;
+  for (auto i=0; i<startSize; i++)
+    q.push_back(rawInput[0][i]);
+
+// Part 1 - answer: 1531
+// Part 2 - answer: 2518
+
+  bool foundDuplicate=false;  
+//  for (auto i=0; i<rawInput.size(); i++) {
+  for (auto i=startSize; i<rawInput[0].length(); i++) {
+    foundDuplicate=false;
+    printf("queue: %c %c %c %c\n", q[0], q[1], q[2], q[3]);
+
+    if (!uniqueVector(q))
+      foundDuplicate=true;
+
+    // for (auto first=0; first<13; first++) {
+    //   for (auto second=first+1; second<14; second++) {
+    //     if (q[first]==q[second]) {
+    //       foundDuplicate=true;
+    //       break;
+    //     }
+    //   }
+    // }
+
+    if (!foundDuplicate) {
+        printf("Found start code at: %d\n", i);
+        exit(1);
+    }
+
+    q.erase(q.begin());
+    q.push_back(rawInput[0][i]);
+  }
+
+  printf("Result: %d\n", tally);
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
   vector<string> rawInput;
-  ingestLines("day5.input", rawInput);
+  ingestLines("day7.input", rawInput);
 
   int tally=0;
 
@@ -590,8 +656,6 @@ int main(int argc, char** argv) {
 
 //  for (auto i=0; i<rawInput.size(); i++) {
   for (auto i=0; i<5; i++) {
-    sscanf(rawInput[i].c_str(), "move %d from %d to %d", &quantity, &from, &to);
-    printf("move %d from %d to %d\n", quantity, from, to);
 
   }
 
