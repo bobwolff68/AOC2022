@@ -642,6 +642,28 @@ const int startSize=14;
   printf("Result: %d\n", tally);
 }
 
+void trimDir(std::string& dirInOut) {
+  if (dirInOut.length() <= 1)
+    return;
+  else {
+    for (auto i=dirInOut.length()-1 ; i>0; i--) {
+      if (dirInOut[i]=='/') {
+        dirInOut = dirInOut.substr(0, i);
+        break;
+      }
+    }
+  }
+}
+
+bool isTopDir(string dir) {
+  if (dir.length() <= 1) 
+    return true;
+  else if (dir.find('/', 2)==std::string::npos)
+    return true;
+  else
+    return false;
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
@@ -654,12 +676,97 @@ int main(int argc, char** argv) {
 
   int quantity, from, to;
 
-//  for (auto i=0; i<rawInput.size(); i++) {
-  for (auto i=0; i<5; i++) {
+// dirs <= 100000 bytes
+// sum of those dir sizes
+
+  map<string, uint32_t> dirs;
+  map<string, uint32_t> trees;   // Tally of the recursive count for this dir
+
+string cmd;
+char cmdChar[10];
+string arg;
+char argChar[30];
+string curdir;
+
+uint32_t tmpSize;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<40; i++) {
+    if (rawInput[i][0] == '$') {
+      // Command
+      assert(rawInput[i][1] == ' ');
+      sscanf(rawInput[i].c_str(), "$ %s %s", cmdChar, argChar);
+      cmd = cmdChar;
+      arg = argChar;
+
+      if (cmd=="cd") {
+        if (arg=="/")
+          curdir="/";
+        else if (arg=="..") {
+          // Need to prune curdir by the tail portion
+//          printf("cd .. - BEFORE: %s\n", curdir.c_str());
+          trimDir(curdir);
+//          printf("cd .. -  AFTER: %s\n", curdir.c_str());
+        }
+        else {
+          // arg is next depth relative
+          curdir += "/";
+          curdir += arg;
+        }
+      }
+      else if (cmd=="ls") {
+        // Do nothing...what follows is 'dir' or 'size' info until next '$'
+        printf("ls found for dir=%s\n", curdir.c_str());
+      }
+    }
+    else {
+      // Not a command - this is a listing
+      sscanf(rawInput[i].c_str(), "%s %s", cmdChar, argChar);
+      cmd = cmdChar;
+      arg = argChar;
+      if (cmd=="dir") {
+        // Nothing to do here????
+      }
+      else {
+        sscanf(cmd.c_str(), "%d", &tmpSize);
+        dirs[curdir] += tmpSize;
+        printf("File found size: %u, tally for %s is %u\n", tmpSize, curdir.c_str(), dirs[curdir]);
+      }
+    }
 
   }
 
+  for (const auto& n : dirs) {
+      if (n.second > 100000)
+        printf("Skipping dir %s\n", n.first.c_str());
+      else {
+        printf("Tally of dir %s is %u\n", n.first.c_str(), n.second);
+        tally += n.second;
+      }
+  }
+
+// 
+  for (const auto& n : dirs) {
+    if (isTopDir(n.first)) {
+      for (const auto& y: dirs) {
+        if (y.first==n.first)
+          continue; // skip the dir at the top
+        else {
+          if (y.first.find(n.first,0)!=std::string::npos) {
+            // now we have a subdirectory of n.first
+            if (y.second <= 100000) {
+              tally += y.second;
+              printf("Subdir %s of %s has %u to tally\n", n.first.c_str(), y.first.c_str(), y.second);
+            }
+          }
+        }
+      }
+    }
+  }
+
   printf("Result: %d\n", tally);
+  // 132067 in root
+  printf("value of / alone is: %u\n", dirs["/"]);
 
 exit(0);
 }
