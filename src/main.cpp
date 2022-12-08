@@ -646,29 +646,17 @@ void trimDir(std::string& dirInOut) {
   if (dirInOut.length() <= 1)
     return;
   else {
-    for (auto i=dirInOut.length()-1 ; i>0; i--) {
-      if (dirInOut[i]=='/') {
-        dirInOut = dirInOut.substr(0, i);
-        break;
-      }
-    }
+    auto i = dirInOut.rfind('/');
+    if (i==0)
+      dirInOut = "/";
+    else
+      dirInOut = dirInOut.substr(0, i);
   }
 }
 
-bool isTopDir(string dir) {
-  if (dir.length() <= 1) 
-    return true;
-  else if (dir.find('/', 2)==std::string::npos)
-    return true;
-  else
-    return false;
-}
-
-int main(int argc, char** argv) {
-  printf("Hello world.\n");
-
+void day7() {
   vector<string> rawInput;
-  ingestLines("day7.input", rawInput);
+  ingestLines("input/day7.input", rawInput);
 
   int tally=0;
 
@@ -708,15 +696,33 @@ uint32_t tmpSize;
           trimDir(curdir);
 //          printf("cd .. -  AFTER: %s\n", curdir.c_str());
         }
+        else if (arg[0]=='.' && arg[1]=='.') {
+          // relative cd with extra stuff.
+          printf("ODDBALL 'cd' argument of: %s\n", arg.c_str());
+          assert(false);
+        }
+        else if (arg[0] == '/') {
+          // absolute path cd
+          printf("ODDBALL 'cd' argument of: %s\n", arg.c_str());
+          assert(false);
+        }
         else {
           // arg is next depth relative
-          curdir += "/";
+          if (curdir != "/")
+            curdir += "/";
           curdir += arg;
+
+          assert(dirs.count(curdir)==0 || dirs[curdir]==0);
+          if (dirs.count(curdir)) {
+            // We've already been here.
+//            printf("DUPLICATE DIRECTORY LS at line [%u]: %s - dir-tally is already:%u\n", i, curdir.c_str(), dirs[curdir]);
+            continue;
+          }
         }
       }
       else if (cmd=="ls") {
         // Do nothing...what follows is 'dir' or 'size' info until next '$'
-        printf("ls found for dir=%s\n", curdir.c_str());
+//        printf("ls found for dir=%s\n", curdir.c_str());
       }
     }
     else {
@@ -725,17 +731,32 @@ uint32_t tmpSize;
       cmd = cmdChar;
       arg = argChar;
       if (cmd=="dir") {
-        // Nothing to do here????
+        string nDir;
+        // Must add entries for all dirs.
+        if (curdir=="/")
+          nDir = curdir + arg;
+        else
+          nDir = curdir + "/" + arg;
+        dirs[nDir] = 0;
       }
       else {
         sscanf(cmd.c_str(), "%d", &tmpSize);
         dirs[curdir] += tmpSize;
-        printf("File found size: %u, tally for %s is %u\n", tmpSize, curdir.c_str(), dirs[curdir]);
+//        printf("File found size: %u, tally for %s is %u\n", tmpSize, curdir.c_str(), dirs[curdir]);
       }
     }
 
   }
 
+#if 0
+// rip through the list of dirs and ERASE (set to zero) any dirs that are >100000
+  for (const auto& n : dirs) {
+      if (n.second > 100000)
+        dirs[n.first] = 0;
+  }
+#endif
+
+#if 0
   for (const auto& n : dirs) {
       if (n.second > 100000)
         printf("Skipping dir %s\n", n.first.c_str());
@@ -744,30 +765,104 @@ uint32_t tmpSize;
         tally += n.second;
       }
   }
+#endif
 
-// 
+// Build the recursive tree - walk the list and at each iteration, 
+// find any other entries aside from itself that have the same starting-dir-name
+// And if they match, add their value to this one.
   for (const auto& n : dirs) {
-    if (isTopDir(n.first)) {
-      for (const auto& y: dirs) {
-        if (y.first==n.first)
-          continue; // skip the dir at the top
-        else {
-          if (y.first.find(n.first,0)!=std::string::npos) {
-            // now we have a subdirectory of n.first
-            if (y.second <= 100000) {
-              tally += y.second;
-              printf("Subdir %s of %s has %u to tally\n", n.first.c_str(), y.first.c_str(), y.second);
-            }
-          }
+    trees[n.first] = n.second;
+    for (const auto& y: dirs) {
+      if (y.first==n.first)
+        continue; // skip ourselves
+      else {
+//        if (y.first.find(n.first,0)!=std::string::npos) {
+        if (y.first.find(n.first,0)==0) {
+          // now we have a subdirectory of n.first
+          trees[n.first] += y.second;
+//          printf("Subdir %s of %s adds %u TotTree: %u\n", y.first.c_str(), n.first.c_str(), y.second, trees[n.first]);
         }
       }
     }
   }
 
+  // Tally the results
+  tally=0;
+  printf("Tally Up trees...\n");
+  for (const auto& n : trees) {
+    if (n.second<=100000) {
+      tally += n.second;
+      printf("  Adding %u found in %s\n", n.second, n.first.c_str());
+    }
+  }
+
+// 2031851 part 1 answer
   printf("Result: %d\n", tally);
   // 132067 in root
   printf("value of / alone is: %u\n", dirs["/"]);
+  printf("value of / for whole tree is: %u\n", trees["/"]);
 
-exit(0);
+
+  const uint32_t toDelete=trees["/"] - 40000000;
+  string candidate;
+  uint32_t bytesWillFree=0;
+
+  for (const auto& n : trees) {
+    if (n.second > toDelete) {
+      // candidate?
+      if (bytesWillFree==0 || n.second < bytesWillFree) {
+        // Better candidate
+        candidate = n.first;
+        bytesWillFree = n.second;
+      }
+    }
+  }
+  printf("Free target: %u ... dir that will free %u bytes is %s\n", toDelete, bytesWillFree, candidate.c_str());
+// Listing for comparisons
+#if 0
+  vector<string> theDirs;
+  for (const auto& n : dirs) {
+    theDirs.push_back(n.first);
+  }
+  printf("DIRS sorted with file-sums\n");
+  std::sort(theDirs.begin(), theDirs.end());
+  for (const auto& n : theDirs) {
+    printf("%s %u\n", n.c_str(), dirs[n]);
+  }
+#endif
+// Listing for comparisons
+#if 0
+  vector<string> theDirs;
+  for (const auto& n : trees) {
+    theDirs.push_back(n.first);
+  }
+  printf("TREES (recursively summed tallies) sorted with file-sums\n");
+  std::sort(theDirs.begin(), theDirs.end());
+  for (const auto& n : theDirs) {
+    printf("%s %u\n", n.c_str(), trees[n]);
+  }
+#endif
+}
+
+int main(int argc, char** argv) {
+  printf("Hello world.\n");
+day7();
+exit(1);
+  vector<string> rawInput;
+  ingestLines("input/day8.input", rawInput);
+
+  int tally=0;
+
+  vector<int> allInts;
+
+  int quantity, from, to;
+
+//  for (auto i=0; i<rawInput.size(); i++) {
+  for (auto i=0; i<10; i++) {
+
+//      sscanf(rawInput[i].c_str(), "$ %s %s", cmdChar, argChar);
+  }
+
+  printf("Final Tally: %d\n", tally);
 }
 
