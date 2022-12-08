@@ -844,25 +844,215 @@ uint32_t tmpSize;
 #endif
 }
 
-int main(int argc, char** argv) {
-  printf("Hello world.\n");
-day7();
-exit(1);
+bool isVisible(int x, int y, vector<string> grid) {
+  // target of interest is x,y
+  // Attack 4 tiems for each direction
+  unsigned char targHeight=grid[y][x];
+  int width=grid[0].length();
+  int height=grid.size();
+  bool isVisible=true;
+  bool dbg=false;
+
+  printf("isVisible: Target tree at y=%d,x=%d is %c\n", y, x, targHeight);
+  // From the left
+  for (auto col=0;col<x;col++) {
+    if (dbg)
+    printf("LEFT: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[y][col],y,col);
+    if (grid[y][col] >= targHeight) {
+//      printf("LEFT: Not visible due to %c at y=%d,x=%d\n", grid[y][col], y,col);
+      isVisible=false;
+      break;  // move on
+    }
+  }
+  if (isVisible)
+    return true;
+  else
+    isVisible=true;
+
+  // To the right starting at the target going right
+  for (auto col=x+1;col<width;col++) {
+    if (dbg)
+    printf("RIGHT: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[y][col],y,col);
+    if (grid[y][col] >= targHeight) {
+      isVisible=false;
+      break;
+    }
+  }
+  if (isVisible)
+    return true;
+  else
+    isVisible=true;
+
+  // From above down to the target
+  for (auto row=0;row<y;row++) {
+    if (dbg)
+    printf("TOP: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[row][x],row,x);
+    if (grid[row][x] >= targHeight) {
+      isVisible=false;
+      break;
+    }
+  }
+  if (isVisible)
+    return true;
+  else
+    isVisible=true;
+
+  // From target row+1 down to bottom
+  for (auto row=y+1;row<height;row++) {
+    if (dbg)
+    printf("BOTTOM: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[row][x],row,x);
+    if (grid[row][x] >= targHeight) {
+      isVisible=false;
+      break;
+    }
+  }
+
+  return isVisible;
+}
+
+int viewingScore(int x, int y, vector<string> grid) {
+  // target of interest is x,y
+  // Attack 4 times for each direction
+  unsigned char targHeight=grid[y][x];
+  int width=grid[0].length();
+  int height=grid.size();
+  int leftScore, rightScore, topScore, bottomScore;
+  bool dbg=false;
+
+  if (dbg)
+    printf("viewingScore: Target tree at y=%d,x=%d is %c\n", y, x, targHeight);
+  // From the left
+  for (auto col=x-1;col>=0;col--) {
+    // if (dbg)
+    // printf("LEFT: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[y][col],y,col);
+    if (grid[y][col] >= targHeight || col==0) {
+//      printf("LEFT: Not visible due to %c at y=%d,x=%d\n", grid[y][col], y,col);
+      leftScore = x-col;
+      if (dbg)
+        printf("  LEFT: score: %d\n",leftScore);
+      break;  // move on
+    }
+  }
+
+  // To the right starting at the target going right
+  for (auto col=x+1;col<width;col++) {
+    // if (dbg)
+    // printf("RIGHT: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[y][col],y,col);
+    if (grid[y][col] >= targHeight || col==width-1) {
+      rightScore = col-x;
+      if (dbg)
+        printf("  RIGHT: score: %d\n",rightScore);
+      break;
+    }
+  }
+
+  // From above down to the target
+  for (auto row=y-1;row>=0;row--) {
+    // if (dbg)
+    // printf("TOP: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[row][x],row,x);
+    if (grid[row][x] >= targHeight || row==0) {
+      topScore = y-row;
+      if (dbg)
+        printf("  TOP: score: %d\n",topScore);
+      break;
+    }
+  }
+
+  // From target row+1 down to bottom
+  for (auto row=y+1;row<height;row++) {
+    // if (dbg)
+    // printf("BOTTOM: targ:%c value:%c at y=%d,x=%d\n",targHeight,grid[row][x],row,x);
+    if (grid[row][x] >= targHeight || row==height-1) {
+      bottomScore = row - y;
+      if (dbg)
+        printf("  BOTTOM: score: %d\n",bottomScore);
+      break;
+    }
+  }
+
+  return leftScore * rightScore * topScore * bottomScore;
+}
+
+void day8() {
   vector<string> rawInput;
   ingestLines("input/day8.input", rawInput);
 
-  int tally=0;
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=width*2 + (height-2)*2; // All trees on the border are visible by definition.
 
   vector<int> allInts;
 
   int quantity, from, to;
 
-//  for (auto i=0; i<rawInput.size(); i++) {
-  for (auto i=0; i<10; i++) {
+#ifdef PART1
+  printf("Grid size is: %d rows and %d columns.\n", height, width);
+
+  for (auto y=1;y<height-1;y++) {
+//  for (auto y=1;y<2;y++) {
+    printf("Grid line raw is: %s\n",rawInput[y].c_str());
+    for (auto x=1;x<width-1;x++) {
+//  for (auto x=1;x<10;x++) {
+      if (isVisible(x,y,rawInput)) {
+        tally++;
+      }
+    }
+  }
+
+//  for (auto i=1; i<rawInput.size(); i++) {
+  for (auto i=0; i<5; i++) {
 
 //      sscanf(rawInput[i].c_str(), "$ %s %s", cmdChar, argChar);
   }
 
-  printf("Final Tally: %d\n", tally);
+// 392 is too low
+// 839 is too low
+// Part 1 - answer 1719
+  printf("Final Part 1 Tally: %d\n", tally);
+#endif
+
+  // Part 2
+  int bestScore=0;
+  int bestX=0;
+  int bestY=0;
+  for (auto y=1;y<height-1;y++) {
+//  for (auto y=1;y<2;y++) {
+//    printf("Grid line raw is: %s\n",rawInput[y].c_str());
+    for (auto x=1;x<width-1;x++) {
+//  for (auto x=1;x<10;x++) {
+      tally = viewingScore(x,y,rawInput);
+      if (tally>bestScore) {
+        bestScore=tally;
+        bestX=x;
+        bestY=y;
+      }
+    }
+  }
+
+// part 2 answer: 590824
+  printf("Final Part 2 best view is from y=%d,x=%d with value of: %d\n", bestY,bestX,bestScore);
 }
 
+int main(int argc, char** argv) {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+  ingestLines("input/day8.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  int quantity, from, to;
+
+//  for (auto i=1; i<rawInput.size(); i++) {
+  for (auto i=0; i<5; i++) {
+
+//      sscanf(rawInput[i].c_str(), "$ %s %s", cmdChar, argChar);
+  }
+
+  printf("Final Part 1 Tally: %d\n", tally);
+
+}
