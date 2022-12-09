@@ -1034,11 +1034,108 @@ void day8() {
   printf("Final Part 2 best view is from y=%d,x=%d with value of: %d\n", bestY,bestX,bestScore);
 }
 
+set<string> tailLocs; // format: X,Y
+
+void setTail(int tX, int tY) {
+  string tLocNow;
+  char chr[10];
+
+  sprintf(chr, "%d,%d", tX, tY);
+  tLocNow = chr;
+  printf("New tail=(%s)\n", tLocNow.c_str());
+
+  tailLocs.insert(tLocNow);
+}
+
+void day9moveUp(int dist, int& hX, int& hY, int& tX, int& tY) {
+  printf("UP: %d\n", dist);
+  for (auto i=0; i<dist; i++) {
+    // Do the movement for head first then tail.
+    hY++;
+
+    if (hY-tY>1) {
+      // Need to move tail up and possibly left/right
+      tY++; // no matter what?
+
+      if (hX != tX) {
+        // This is the case where the tail needs to get 'in line' with head
+        assert(abs(hX-tX)==1);
+        tX = hX;
+      }
+    }
+
+    setTail(tX, tY);
+  }
+}
+
+void day9moveDown(int dist, int& hX, int& hY, int& tX, int& tY) {
+  printf("DOWN: %d\n", dist);
+  for (auto i=0; i<dist; i++) {
+    // Do the movement for head first then tail.
+    hY--;
+
+    if (tY-hY>1) {
+      // Need to move tail down and possibly left/right
+      tY--; // no matter what?
+
+      if (hX != tX) {
+        // This is the case where the tail needs to get 'in line' with head
+        assert(abs(hX-tX)==1);
+        tX = hX;
+      }
+    }
+
+    setTail(tX, tY);
+  }
+}
+
+void day9moveRight(int dist, int& hX, int& hY, int& tX, int& tY) {
+  printf("RIGHT: %d\n", dist);
+  for (auto i=0; i<dist; i++) {
+    // Do the movement for head first then tail.
+    hX++;
+
+    if (hX-tX>1) {
+      // Need to move tail up and possibly left/right
+      tX++; // no matter what?
+
+      if (hY != tY) {
+        // This is the case where the tail needs to get 'in line' with head
+        assert(abs(hY-tY)==1);
+        tY = hY;
+      }
+    }
+
+    setTail(tX, tY);
+  }
+}
+
+void day9moveLeft(int dist, int& hX, int& hY, int& tX, int& tY) {
+  printf("LEFT: %d\n", dist);
+  for (auto i=0; i<dist; i++) {
+    // Do the movement for head first then tail.
+    hX--;
+
+    if (tX-hX>1) {
+      // Need to move tail up and possibly left/right
+      tX--; // no matter what?
+
+      if (hY != tY) {
+        // This is the case where the tail needs to get 'in line' with head
+        assert(abs(hY-tY)==1);
+        tY = hY;
+      }
+    }
+
+    setTail(tX, tY);
+  }
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
   vector<string> rawInput;
-  ingestLines("input/day8.input", rawInput);
+  ingestLines("input/day9-sample2.input", rawInput);
 
   int width=rawInput[0].length();
   int height=rawInput.size();
@@ -1046,13 +1143,50 @@ int main(int argc, char** argv) {
   int tally=0;
 
   int quantity, from, to;
+  char dir;
+  int dist;
 
-//  for (auto i=1; i<rawInput.size(); i++) {
-  for (auto i=0; i<5; i++) {
+  int headX, headY;
+  int tailX, tailY;
 
-//      sscanf(rawInput[i].c_str(), "$ %s %s", cmdChar, argChar);
+  headX=0;
+  headY=0;
+  tailX=0;
+  tailY=0;
+
+  tailLocs.insert("0,0");
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+    sscanf(rawInput[i].c_str(), "%c %d", &dir, &dist);
+//    printf("Got: %c %d\n", dir, dist);
+
+    if (dir=='U') {
+      day9moveUp(dist, headX, headY, tailX, tailY);
+    }
+    else if (dir=='D') {
+      day9moveDown(dist, headX, headY, tailX, tailY);
+    }
+    else if (dir=='R') {
+      day9moveRight(dist, headX, headY, tailX, tailY);
+    }
+    else if (dir=='L') {
+      day9moveLeft(dist, headX, headY, tailX, tailY);
+    }
+    else {
+      assert(false);
+    }
+
   }
 
-  printf("Final Part 1 Tally: %d\n", tally);
+  printf("printing list of tail locations:\n");
+  for (const auto& elem : tailLocs)
+    printf(" (%s) :", elem.c_str());
+  printf("\n");
+
+// Part 1 answer: 6357
+  printf("Part 1 - total tail locations: %u\n", tailLocs.size());
+
+//  printf("Final Part 1 Tally: %d\n", tally);
 
 }
