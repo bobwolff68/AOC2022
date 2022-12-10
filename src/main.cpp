@@ -1034,108 +1034,183 @@ void day8() {
   printf("Final Part 2 best view is from y=%d,x=%d with value of: %d\n", bestY,bestX,bestScore);
 }
 
+// Day 9 item global
 set<string> tailLocs; // format: X,Y
 
 void setTail(int tX, int tY) {
   string tLocNow;
   char chr[10];
 
-  sprintf(chr, "%d,%d", tX, tY);
+  snprintf(chr, 10, "%d,%d", tX, tY);
   tLocNow = chr;
-  printf("New tail=(%s)\n", tLocNow.c_str());
+//  printf("New tail=(%s)\n", tLocNow.c_str());
 
   tailLocs.insert(tLocNow);
 }
 
-void day9moveUp(int dist, int& hX, int& hY, int& tX, int& tY) {
-  printf("UP: %d\n", dist);
-  for (auto i=0; i<dist; i++) {
-    // Do the movement for head first then tail.
-    hY++;
+void day9printGrid(const char* msg, int* X, int* Y, int leftX, int rightX, int bottomY, int topY) {
+  char line[rightX-leftX + 1];
+  int width=rightX-leftX + 1;
+  int height=topY-bottomY + 1;
+  int offsetX;
+  int offsetY;
 
-    if (hY-tY>1) {
-      // Need to move tail up and possibly left/right
-      tY++; // no matter what?
+  offsetX = -leftX;
+  offsetY = -bottomY;
 
-      if (hX != tX) {
-        // This is the case where the tail needs to get 'in line' with head
-        assert(abs(hX-tX)==1);
-        tX = hX;
+  if (msg)
+    printf("GRID-PRINT: %s\n", msg);
+
+  for (int row=topY; row>=bottomY; row--) {
+    for (int q=0; q<width; q++) 
+      line[q]='.';
+    line[width]=0;
+
+    if (row==0) {
+      // We have the origin in here. Put a 's' there if offsetX is positive (it's on screen)
+      if (offsetX>=0)
+        line[offsetX]='s';
+    }
+
+    for (int col=leftX; col<rightX; col++) {
+      for (int knot=0; knot<10; knot++) {
+        // Now let's place numbers
+        if (line[col+offsetX]=='.' || line[col+offsetX]=='s') {
+          // We can place a number here if one belongs here.
+          if (X[knot]==col && Y[knot]==row) {
+            if (knot==0)
+              line[col+offsetX] = 'H';
+            else
+              line[col+offsetX] = '0'+knot;
+            break;  // don't allow anyone 'higher' in the chain print here.
+          }
+        }
       }
     }
 
-    setTail(tX, tY);
+    printf("%s\n", line);
   }
+
 }
 
-void day9moveDown(int dist, int& hX, int& hY, int& tX, int& tY) {
-  printf("DOWN: %d\n", dist);
+void day9printLocs(const char* msg, int* X, int* Y, int depth=4) {
+  bool dbg=false;
+  if (!dbg)
+    return;
+
+  printf("XY-Placement (%s):", msg);
+  for (auto i=0; i<depth; i++) {
+    printf(" [%d]=(%d,%d) :", i, X[i], Y[i]);
+  }
+  printf("\n");
+}
+
+void day9move(char dir, int dist, int* kX, int* kY) {
+  bool detaildbg=false;
+  printf("DIRECTION/DISTANCE: %c %d\n", dir, dist);
+  day9printLocs("BEFORE", kX, kY, 10);
+  if (detaildbg) day9printGrid("BEFORE STARTING MOVE", kX, kY, -11, 14, -5, 15);
+
   for (auto i=0; i<dist; i++) {
-    // Do the movement for head first then tail.
-    hY--;
-
-    if (tY-hY>1) {
-      // Need to move tail down and possibly left/right
-      tY--; // no matter what?
-
-      if (hX != tX) {
-        // This is the case where the tail needs to get 'in line' with head
-        assert(abs(hX-tX)==1);
-        tX = hX;
-      }
+    // Do the movement for head first. All else follows
+    switch(dir) {
+      case 'U':
+        kY[0]++;
+        break;
+      case 'D':
+        kY[0]--;
+        break;
+      case 'R':
+        kX[0]++;
+        break;
+      case 'L':
+        kX[0]--;
+        break;
+      default:
+        assert("bad direction."==NULL);
+        break;
     }
 
-    setTail(tX, tY);
-  }
-}
+    for (auto iter=0; iter<9; iter++) {
+      if (detaildbg) printf("  Repeat:%d Iter:%d: Before: [%d]=(%d,%d) and [%d]=(%d,%d)\n", i, iter, iter, kX[iter],kY[iter], iter+1, kX[iter+1],kY[iter+1]);
 
-void day9moveRight(int dist, int& hX, int& hY, int& tX, int& tY) {
-  printf("RIGHT: %d\n", dist);
-  for (auto i=0; i<dist; i++) {
-    // Do the movement for head first then tail.
-    hX++;
-
-    if (hX-tX>1) {
-      // Need to move tail up and possibly left/right
-      tX++; // no matter what?
-
-      if (hY != tY) {
-        // This is the case where the tail needs to get 'in line' with head
-        assert(abs(hY-tY)==1);
-        tY = hY;
+      if (abs(kX[iter]-kX[iter+1]) > 2) {
+        printf("kX[%d]=%d and kX[%d]=%d. Shouldn't be more than 2 from each other.\n", iter, kX[iter], iter+1, kX[iter+1]);
+        assert("bad kX distance."==NULL);
       }
+
+      if (abs(kY[iter]-kY[iter+1]) > 2) {
+        printf("kY[%d]=%d and kY[%d]=%d. Shouldn't be more than 2 from each other.\n", iter, kY[iter], iter+1, kY[iter+1]);
+        assert("bad kY distance."==NULL);
+      }
+
+      if (abs(kY[iter]-kY[iter+1])>1 || abs(kX[iter]-kX[iter+1])>1) {
+
+        if (dir=='U' || dir=='D') {
+          if (abs(kX[iter] - kX[iter+1])==1) {
+            // This is the case where the tail needs to get 'in line' with head
+            kX[iter+1] = kX[iter];
+          }
+        }
+        else if (dir=='L' || dir=='R') {
+          if (abs(kY[iter] - kY[iter+1])==1) {
+            // This is the case where the tail needs to get 'in line' with head
+            kY[iter+1] = kY[iter];
+          }
+        }
+
+        if ((abs(kX[iter] - kX[iter+1])==2)) {
+            // new movement item. Direction is up, but we got a 2-gap on the x. Gap-up by one.
+            if (kX[iter] > kX[iter+1])
+              kX[iter+1]++;
+            else
+              kX[iter+1]--;
+            
+            // Always gap-up the Y in this case so long as there *IS* a gap.
+            if ((abs(kY[iter] - kY[iter+1])!=0)) {
+              if (kY[iter] > kY[iter+1])
+                kY[iter+1]++;
+              else
+                kY[iter+1]--;
+            }
+        }
+
+        if ((abs(kY[iter] - kY[iter+1])==2)) {
+            // New movement - Y must need to gap up by one.
+            if (kY[iter] > kY[iter+1])
+                kY[iter+1]++;
+              else
+                kY[iter+1]--;
+
+            // Always gap-up the X in this case so long as there *IS* a gap.
+            if ((abs(kX[iter] - kX[iter+1])!=0)) {
+              if (kX[iter] > kX[iter+1])
+                kX[iter+1]++;
+              else
+                kX[iter+1]--;
+            }
+        }
+      }
+
+      if (iter==8)
+        setTail(kX[9], kY[9]);
+
+//      if (detaildbg && dir=='L') day9printGrid("AFTER KNOT Processed", kX, kY, -11, 14, -5, 15);
+      if (detaildbg) printf("  Repeat:%d Iter:%d:  After: [%d]=(%d,%d) and [%d]=(%d,%d)\n", i, iter, iter, kX[iter],kY[iter], iter+1, kX[iter+1],kY[iter+1]);
     }
 
-    setTail(tX, tY);
+      if (detaildbg) day9printGrid("AFTER ONE FULL ROPE MOVEMENT", kX, kY, -11, 14, -5, 15);
+    day9printLocs("INTERIM", kX, kY);
   }
+  day9printLocs("AFTER", kX, kY, 10);
 }
 
-void day9moveLeft(int dist, int& hX, int& hY, int& tX, int& tY) {
-  printf("LEFT: %d\n", dist);
-  for (auto i=0; i<dist; i++) {
-    // Do the movement for head first then tail.
-    hX--;
-
-    if (tX-hX>1) {
-      // Need to move tail up and possibly left/right
-      tX--; // no matter what?
-
-      if (hY != tY) {
-        // This is the case where the tail needs to get 'in line' with head
-        assert(abs(hY-tY)==1);
-        tY = hY;
-      }
-    }
-
-    setTail(tX, tY);
-  }
-}
-
-int main(int argc, char** argv) {
-  printf("Hello world.\n");
+void day9() {
 
   vector<string> rawInput;
-  ingestLines("input/day9-sample2.input", rawInput);
+//  ingestLines("input/day9-sample.input", rawInput);
+//  ingestLines("input/day9-sample2.input", rawInput);
+  ingestLines("input/day9.input", rawInput);
 
   int width=rawInput[0].length();
   int height=rawInput.size();
@@ -1149,33 +1224,39 @@ int main(int argc, char** argv) {
   int headX, headY;
   int tailX, tailY;
 
-  headX=0;
-  headY=0;
-  tailX=0;
-  tailY=0;
+  int knotX[10];
+  int knotY[10];
+
+  for (auto i=0; i<10; i++) {
+    knotX[i] = 0;
+    knotY[i] = 0;
+  }
 
   tailLocs.insert("0,0");
 
   for (auto i=0; i<rawInput.size(); i++) {
-//  for (auto i=0; i<5; i++) {
+//  for (auto i=0; i<3; i++) {
     sscanf(rawInput[i].c_str(), "%c %d", &dir, &dist);
 //    printf("Got: %c %d\n", dir, dist);
 
+    day9move(dir, dist, knotX, knotY);
+#if 0
     if (dir=='U') {
-      day9moveUp(dist, headX, headY, tailX, tailY);
+      day9moveUp(dist, knotX, knotY);
     }
     else if (dir=='D') {
-      day9moveDown(dist, headX, headY, tailX, tailY);
+      day9moveDown(dist, knotX, knotY);
     }
     else if (dir=='R') {
-      day9moveRight(dist, headX, headY, tailX, tailY);
+      day9moveRight(dist, knotX, knotY);
     }
     else if (dir=='L') {
-      day9moveLeft(dist, headX, headY, tailX, tailY);
+      day9moveLeft(dist, knotX, knotY);
     }
     else {
       assert(false);
     }
+#endif
 
   }
 
@@ -1185,7 +1266,34 @@ int main(int argc, char** argv) {
   printf("\n");
 
 // Part 1 answer: 6357
-  printf("Part 1 - total tail locations: %u\n", tailLocs.size());
+// Part 2 - 2598 is too low
+// Part 2 - 2636 is too high
+// Part 2 - 2627 is the answer
+  printf("Part 1 - total tail locations: %lu\n", tailLocs.size());
+}
+
+int main(int argc, char** argv) {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day10-sample.input", rawInput);
+//  ingestLines("input/day10-sample2.input", rawInput);
+  ingestLines("input/day10.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  int quantity, from, to;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<3; i++) {
+//    sscanf(rawInput[i].c_str(), "%c %d", &dir, &dist);
+//    printf("Got: %c %d\n", dir, dist);
+
+
+  }
 
 //  printf("Final Part 1 Tally: %d\n", tally);
 
