@@ -1272,6 +1272,49 @@ void day9() {
   printf("Part 1 - total tail locations: %lu\n", tailLocs.size());
 }
 
+#define WIDE 40
+#define TALL 6
+char CRT[WIDE*TALL];
+char spr[WIDE+1];
+
+void day10printSprite(int x) {
+  for (auto z=0; z<WIDE; z++)
+    spr[z] = '.';
+  spr[40] = 0;  // Null terminator
+  
+  if (x==-1)  // 3-wide sprite will only show at '0'
+    spr[0] = '#';
+  else if (x==0) {
+    spr[0] = '#';
+    spr[1] = '#';
+  }
+  else if (x>=1 && x<=38) {
+    spr[x-1] = '#';
+    spr[x]   = '#';
+    spr[x+1] = '#';
+  }
+  else if (x==39) {
+    spr[38] = '#';
+    spr[39] = '#';
+  }
+  else if (x==40)
+    spr[39] = '#';
+  
+  printf("Sprite Position: %s\n", spr);
+}
+
+void day10printCRT() {
+  for (auto row=0; row<TALL; row++) {
+    for (auto col=0; col<WIDE; col++) {
+      if (col == 0)
+        printf("\n");
+      printf("%c", CRT[row*WIDE + col]);
+    }
+  }
+  
+  printf("\n");
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
@@ -1286,15 +1329,73 @@ int main(int argc, char** argv) {
   int tally=0;
 
   int quantity, from, to;
+  char charCmd[10];
+  string strCmd;
+  int regX=1;
+  int operand=0;
+  bool dbg=true;
+  bool deepdbg=true;
+  int line=0;
+  int readyIn=0;
 
-  for (auto i=0; i<rawInput.size(); i++) {
-//  for (auto i=0; i<3; i++) {
-//    sscanf(rawInput[i].c_str(), "%c %d", &dir, &dist);
-//    printf("Got: %c %d\n", dir, dist);
+  for (auto z=0; z<TALL*WIDE; z++)
+    CRT[z] = ' ';
 
+//  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+//  for (auto i=0; i<rawInput.size(); i++) {
+  for (int cycle=1; cycle<10000; cycle++) {
 
+    if (readyIn==0) {
+      // Calculate any change.
+      regX += operand;
+      if (dbg) printf("[%d]=%d Beginning of new instr being read\n", cycle, regX);
+
+      // When we *ARE* ready to read, don't read beyond the eof
+      if (line >= rawInput.size())
+        break;
+
+      // Read next instruction.
+      sscanf(rawInput[line].c_str(), "%s", charCmd);
+      strCmd = charCmd;
+      if (strCmd == "addx") {
+        sscanf(rawInput[line].c_str(), "%s %d", charCmd, &operand);
+        if (deepdbg) printf("[%d]=%d   Instruction addx %d given\n", cycle, regX, operand);
+        readyIn=2;
+      }
+      else if (strCmd=="noop") {
+        readyIn=1;
+        operand=0;
+      }
+      else
+        assert("BadCMD"==NULL);
+
+      line++;
+    }
+    else
+      printf("[%d]=%d   Processing...\n", cycle, regX);
+
+    // Let's do drawing things.
+    day10printSprite(regX);
+    int pixelToDraw = (cycle-1) % (WIDE*TALL);
+    CRT[pixelToDraw] = spr[pixelToDraw%WIDE];
+    if (deepdbg) day10printCRT();
+
+    if (cycle==20 || ((cycle-20) % 40 == 0)) {
+      int tmpsigstrength = cycle*regX;
+      if (dbg) printf("[%d]=%d Calculating sigstrength=%d\n", cycle, regX, tmpsigstrength);
+      tally += tmpsigstrength;
+    }
+
+    // End of the cycle. cycle++ will happen due to for()
+    readyIn--;
   }
 
-//  printf("Final Part 1 Tally: %d\n", tally);
+  printf("FINAL CRT IMAGE\n");
+  day10printCRT();
+
+// Part 1 - answer 14040
+// Part 2 - ZGCJZJFL
+  printf("Final Part 1 Tally: %d\n", tally);
 
 }
