@@ -1315,9 +1315,7 @@ void day10printCRT() {
   printf("\n");
 }
 
-int main(int argc, char** argv) {
-  printf("Hello world.\n");
-
+void day10() {
   vector<string> rawInput;
 //  ingestLines("input/day10-sample.input", rawInput);
 //  ingestLines("input/day10-sample2.input", rawInput);
@@ -1396,6 +1394,30 @@ int main(int argc, char** argv) {
 
 // Part 1 - answer 14040
 // Part 2 - ZGCJZJFL
+  printf("Final Part 1 Tally: %d\n", tally);
+}
+
+int main(int argc, char** argv) {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day10-sample.input", rawInput);
+//  ingestLines("input/day10-sample2.input", rawInput);
+  ingestLines("input/day10.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  int quantity, from, to;
+
+//  for (auto i=0; i<rawInput.size(); i++) {
+  for (auto i=0; i<5; i++) {
+      // Read next instruction.
+//        sscanf(rawInput[line].c_str(), "%s %d", charCmd, &operand);
+  }
+
   printf("Final Part 1 Tally: %d\n", tally);
 
 }
