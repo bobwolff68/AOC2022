@@ -5,6 +5,7 @@
 #include "stdio.h"
 #include <string>
 #include <vector>
+#include <tuple>
 #include <map>
 #include <set>
 #include <queue>
@@ -438,36 +439,24 @@ void day13printItem(stItem_t* pItems) {
   int iter=0;
   bool dbg=true;
 
-  while(1) {
-    if (dbg) printf("Iter: %d\n", iter);
-    if (pI)
-      printf("[");
-    else
-      break;
-    
-    if (pI->values.size()) {
-      int sz=pI->values.size();
-      for(auto x=0; x<sz; x++) {
-        printf("%d", pI->values[x]);
-        if (x!=sz-1)
-          printf(",");
-      }
-      printf("]");
-    }
-
-    if (pI->pNext) {
-      if (pI->values.size())
+  if (dbg) printf("Node has %lu values and has %s list entry.\n", pItems->values.size(), pItems->pNext ? "a" : "no");
+  printf("[");
+  
+  if (pI->values.size()) {
+    int sz=pI->values.size();
+    for(auto x=0; x<sz; x++) {
+      printf("%d", pI->values[x]);
+      if (x!=sz-1)
         printf(",");
-      pI=pI->pNext;
     }
-    else {
-      printf("]\n");
-      break;
-    }
-
-    iter++;
   }
-  printf("\n");
+
+  if (pI->pNext) {
+    printf("]");
+    day13printItem(pI->pNext);
+  }
+
+  printf("]\n");
 }
 
 void day13deleteNode(stItem_t* pI) {
@@ -486,49 +475,6 @@ void day13freeItem(stItem_t* pItems) {
     day13deleteNode(pItems->pNext);
 
   day13nodeInit(pItems);
-}
-
-void day13parseLine(stItem_t* pItems, const char* ch) {
-  assert(pItems);
-  assert(ch);
-
-  int tmpValue;
-  int ret;
-
-  // Skip the first character which is always [
-  for (auto x=1; x<strlen(ch); x++) {
-    if (ch[x]=='[') {
-      pItems->pNext = new stItem_t;
-      assert(pItems->pNext);
-      day13nodeInit(pItems->pNext);
-      pItems = pItems->pNext;
-    }
-    else if (ch[x]==']') {
-      // End of a list. Nothing to do here?
-    }
-    else if (ch[x]==',') {
-      // Comma separator ... skip it...
-    }
-    else if (ch[x]==0)
-      break;
-    else {
-      // Bring in a number and advance to either a ',' or a ']'
-      ret = sscanf(ch+x, "%d", &tmpValue);
-      if (ret==0) {
-        printf("  PROBLEM reading number at loc:%d - string:%s\n", x, ch);
-        break;
-      }
-      else if (ret==EOF) {
-        printf("  FOUND EOF reading number. Hmm - at val:%d, loc:%x, str:%s\n", tmpValue, x, ch);
-        break;
-      }
-      else {
-        pItems->values.push_back(tmpValue);
-        while (ch[x]>='0' && ch[x]<='9')
-          x++;
-      }
-    }
-  }
 }
 
 int day13newNode(stItem_t* pI, const char* ch) {
@@ -551,42 +497,35 @@ int day13newNode(stItem_t* pI, const char* ch) {
   while (1) {
     if (ch[x]=='[') {
       if (dbg) printf("Going for new node @ [%d]\n", x+1);
-      x += day13newNode(pInew, ch+x+1);
+      x = x+1+ day13newNode(pInew, ch+x+1);
       if (dbg) printf("  Resuming parsing after new node @[%d]: %s\n", x, ch+x);
       continue;
     }
-    else if (ch[x]==']' || ch[x]==0)
+    else if (ch[x]==']' || ch[x]==0) {
+      printf("  Exiting node - number of values in node are:%lu @[%d]: %s\n", pInew->values.size(), x, ch);
       return x+1;
+    }
     else if (ch[x]==',') {
       x++;
       continue;
     }
     else {
-      // Bring in a number and iterate numbers and commas
-      while(1) {
-        ret = sscanf(ch+x, "%d", &tmpValue);
-        if (ret==0) {
-          printf("  PROBLEM reading number at loc:%d - string:%s\n", x, ch);
-          break;
-        }
-        else if (ret==EOF) {
-          printf("  FOUND EOF reading number. Hmm - at val:%d, loc:%x, str:%s\n", tmpValue, x, ch);
-          break;
-        }
-        else {
-          if (dbg) printf("  Got value @ [%d]: %d\n", x, tmpValue);
-          pInew->values.push_back(tmpValue);
-          while ((ch[x]>='0' && ch[x]<='9') || ch[x]==',') {
-//            if (dbg) printf("newNode: Skipping (%c)\n", ch[x]);
-            x++;
-            if (ch[x-1]==',')
-              break;
-          }
-        }
-
-        if (ch[x]=='[' || ch[x]==']') {
-          if (dbg) printf("  Skipping out of number list @[%d] due to: (%c)\n", x, ch[x]);
-          break;
+      // Bring in a number and advance past the number - then go for next round.
+      ret = sscanf(ch+x, "%d", &tmpValue);
+      if (ret==0) {
+        printf("  PROBLEM reading number at loc:%d - string:%s\n", x, ch);
+        break;
+      }
+      else if (ret==EOF) {
+        printf("  FOUND EOF reading number. Hmm - at val:%d, loc:%x, str:%s\n", tmpValue, x, ch);
+        break;
+      }
+      else {
+        pInew->values.push_back(tmpValue);
+        if (dbg) printf("  Got value @ [%d]: %d - number of values in list is:%lu\n", x, tmpValue, pInew->values.size());
+        while (ch[x+1]>='0' && ch[x+1]<='9') {
+          if (dbg) printf("newNode: Skipping @[%d] (%c)\n", x, ch[x]);
+          x++;
         }
       }
     }
@@ -622,14 +561,16 @@ void day13() {
       day13freeItem(pI);
       day13newNode(pI, rawInput[i].c_str()+1);
 //      day13parseLine(pI, rawInput[i].c_str());
-      day13printItem(pI);
+      assert(pI->pNext);
+      day13printItem(pI->pNext);
     }
     else if (i % 3 == 1) {
       pI = &rootSecond;
       day13freeItem(pI);
       day13newNode(pI, rawInput[i].c_str()+1);
 //      day13parseLine(pI, rawInput[i].c_str());
-      day13printItem(pI);
+      assert(pI->pNext);
+      day13printItem(pI->pNext);
     }
     else
       printf("Time to compare stuff.\n");
@@ -639,13 +580,505 @@ void day13() {
 //  printf("Final Part 1 Tally: %d\n", tally);
 }
 
+class cube {
+public:
+  cube(int x, int y, int z) { ox=x; oy=y; oz=z;
+    for (auto x=0; x<6; x++) showing[x]=true;
+    bIsOutside=false;};
+  enum Sides {Front, Back, Left, Right, Bottom, Top};
+  // Can't have MORE than a single common side.
+  // ONLY one axis can be different and only by 1.
+  void CalcCommon(int x, int y, int z) {
+    if (x==ox && y==oy && z==oz) {
+      printf("SAME Origin: (%d,%d,%d)\n", x, y, z);
+    }
+    else if (x==ox && y==oy && abs(z-oz)==1) {
+      // Top or bottom are common.
+      if (z > oz) showing[Top]=false;
+      else showing[Bottom]=false;
+    }
+    else if (x==ox && abs(y-oy)==1 && z==oz) {
+      // Front or Back are common.
+      if (y > oy) showing[Back]=false;
+      else showing[Front]=false;
+    }
+    else if (abs(x-ox)==1 && y==oy && z==oz) {
+      // Left or Right are common.
+      if (x > ox) showing[Right]=false;
+      else showing[Left]=false;
+    }
+  };
+  int SidesShowing() { int numShowing=0;
+    for (auto x=0; x<6; x++)
+      if (showing[x]) numShowing++;
+    return numShowing;
+  };
+
+  int ox, oy, oz;
+  bool showing[6];
+  bool bIsOutside;
+};
+
+vector<cube> theCubes;
+
+cube* isFound(int x, int y, int z) {
+  for (std::vector<cube>::iterator it=theCubes.begin(); it<theCubes.end(); it++)
+    if (it->ox==x && it->oy==y && it->oz==z) {
+      return &theCubes[it-theCubes.begin()];
+    }
+  
+  return nullptr;
+}
+
+void markLocationOutsideIfFound(int x, int y, int z) {
+  cube* pc=isFound(x,y,z);
+  if (pc) {
+    pc->bIsOutside=true;
+  }
+}
+
+int tallyExternal() {
+  int tally=0;
+  for (auto it: theCubes)
+    if (it.bIsOutside) tally++;
+
+  return tally;
+}
+
+int getNumSidesOnExternals() {
+  int tally=0;
+  for (auto it: theCubes)
+    if (it.bIsOutside) {
+      tally += it.SidesShowing();
+    }
+
+  return tally;
+}
+
+int getNumSidesOnInternals() {
+  int tally=0;
+  for (auto it: theCubes)
+    if (it.bIsOutside==false) {
+      tally += it.SidesShowing();
+    }
+
+  return tally;
+}
+
+void day18() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day18-sample.input", rawInput);
+//  ingestLines("input/day18-sample2.input", rawInput);
+  ingestLines("input/day18.input", rawInput);
+
+  int height=rawInput.size();
+
+  int tally=0;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+      // Read next instruction.
+      int x,y,z;
+      sscanf(rawInput[i].c_str(), "%d,%d,%d", &x, &y, &z);
+      theCubes.push_back(cube(x,y,z));
+  }
+
+  printf("Number of cubes=%lu\n", theCubes.size());
+  cube* pMyCube;
+  cube* pTheirCube;
+  for (auto me=0; me<theCubes.size(); me++) {
+    pMyCube=&theCubes[me];
+    for (auto them=0; them<theCubes.size(); them++) {
+      pTheirCube=&theCubes[them];
+      if (me==them)
+        continue;
+      pMyCube->CalcCommon(pTheirCube->ox,pTheirCube->oy,pTheirCube->oz);
+    }
+  }
+
+  for (auto it: theCubes)
+    tally += it.SidesShowing();
+
+// Part 1 - answer is 3636
+  printf("Final Part 1 Tally: %d\n", tally);
+
+  int minx, maxx, miny, maxy, minz, maxz;
+  int t;
+  t=theCubes[0].ox;
+  minx=maxx=t;
+  t=theCubes[0].oy;
+  miny=maxy=t;
+  t=theCubes[0].oz;
+  minz=maxz=t;
+  for (auto it: theCubes) {
+    if (it.ox<minx) minx=it.ox;
+    if (it.ox>maxx) maxx=it.ox;
+    if (it.oy<miny) miny=it.oy;
+    if (it.oy>maxy) maxy=it.oy;
+    if (it.oz<minz) minz=it.oz;
+    if (it.oz>maxz) maxz=it.oz;
+  }
+  // Now we know the overall min and max 'scan area'
+  // expand the bounds of x/y/z box by one in all directions.
+  //   This makes it easier later for our external scan.
+    minx--; maxx++;
+    miny--; maxy++;
+    minz--; maxz++;
+
+  cube* pc;
+
+
+// Create a 2-d map of the front-shell and the back-shell
+// Then iterate "Y" through each 2-d item to count ANY missing items.
+// 
+// Might I need an outer shell for the other directions too??
+
+//
+// Push front to back - note when we get to the first cube and begin counting ABSENT cubes
+//   until we run into another cube. Then quit the push.
+//
+    bool foundOutside=false;
+    int missingInternal=0;
+    int candidates=0;
+    for (auto x=minx; x<maxx; x++) {
+      for (auto z=minz; z<maxz; z++) {
+        foundOutside=false;
+        candidates=0;
+        for (auto y=miny; y<maxy; y++) {
+          pc = isFound(x,y,z);
+          if (pc && !foundOutside) {
+            foundOutside=true;
+          }
+          else if (foundOutside && !pc) {
+            // Found an internal missing cube.
+            candidates++;
+          }
+          else if (foundOutside && pc) {
+            // We've reached the other side of the shell
+            missingInternal += candidates;
+            if (candidates) 
+              printf("Adding %d candidates now that we found the back side of the shell\n", candidates);
+            break;
+          }
+        }
+      }
+    }
+  printf("INTERNAL_HOLES: %d\n", missingInternal);
+
+
+
+  // Now we approach the droplet from each of 6 directions and identify the first
+    for (auto x=minx; x<maxx; x++) {
+      for (auto z=minz; z<maxz; z++) {
+        for (auto y=miny; y<maxy; y++) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Back]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x-1,y,z);
+          markLocationOutsideIfFound(x+1,y,z);
+          markLocationOutsideIfFound(x,y,z-1);
+          markLocationOutsideIfFound(x,y,z+1);
+        }
+      }
+    }
+
+    printf("FRONT_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+    for (auto y=miny; y<maxy; y++) {
+      for (auto z=minz; z<maxz; z++) {
+        for (auto x=minx; x<maxx; x++) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Right]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x,y-1,z);
+          markLocationOutsideIfFound(x,y+1,z);
+          markLocationOutsideIfFound(x,y,z-1);
+          markLocationOutsideIfFound(x,y,z+1);
+        }
+      }
+    }
+
+    printf("LEFT_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+    for (auto y=miny; y<maxy; y++) {
+      for (auto x=minx; x<maxx; x++) {
+        for (auto z=minz; z<maxz; z++) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Top]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x,y-1,z);
+          markLocationOutsideIfFound(x,y+1,z);
+          markLocationOutsideIfFound(x-1,y,z);
+          markLocationOutsideIfFound(x+1,y,z);
+        }
+      }
+    }
+
+    printf("BOTTOM_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+//
+// Now the NEGATIVE moving sides
+//
+    for (auto y=maxy; y>=miny; y--) {
+      for (auto z=maxz; z>=minz; z--) {
+        for (auto x=maxx; x>=minx; x--) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Left]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x,y-1,z);
+          markLocationOutsideIfFound(x,y+1,z);
+          markLocationOutsideIfFound(x,y,z-1);
+          markLocationOutsideIfFound(x,y,z+1);
+        }
+      }
+    }
+
+    printf("RIGHT_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+    for (auto z=maxz; z>=minz; z--) {
+      for (auto x=maxx; x>=minx; x--) {
+        for (auto y=maxy; y>=miny; y--) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Front]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x-1,y,z);
+          markLocationOutsideIfFound(x+1,y,z);
+          markLocationOutsideIfFound(x,y,z-1);
+          markLocationOutsideIfFound(x,y,z+1);
+        }
+      }
+    }
+
+    printf("BACK_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+    for (auto x=maxx; x>=minx; x--) {
+      for (auto y=maxy; y>=miny; y--) {
+        for (auto z=maxz; z>=minz; z--) {
+          markLocationOutsideIfFound(x,y,z);
+          pc = isFound(x,y,z);
+          if (pc) {
+            pc->showing[cube::Bottom]=false;
+            break;
+          }
+
+          markLocationOutsideIfFound(x-1,y,z);
+          markLocationOutsideIfFound(x+1,y,z);
+          markLocationOutsideIfFound(x,y-1,z);
+          markLocationOutsideIfFound(x,y+1,z);
+        }
+      }
+    }
+
+    printf("TOP_CHECK: Out of %lu total cubes, %d are external\n", theCubes.size(), tallyExternal());
+
+// part 2 showed 3636 which is too high
+//     3258 is also too high which was 3636 - 63*6 for the 63 internal open spots
+//     but 
+  printf("BOGUS - Counting only external cubes for sides-showing results in: %d\n", getNumSidesOnExternals());
+
+  printf("How many exposed sides are INTERNAL: %d\n", getNumSidesOnInternals());
+  // for (auto it: theCubes) {
+  //   if (it.bIsOutside==false) {
+  //     printf("Internal at (%d,%d,%d)\n", it.ox, it.oy, it.oz);
+  //   }
+  // }
+}
+
+void day20printVec(const char* msg, int iter, const vector<tuple<int,bool>> in) {
+  assert(msg);
+  printf("@Iteration=%d - %s: <", iter, msg);
+  for (auto it: in) {
+    printf("%d:%c ", get<0>(it), get<1>(it) ? 't' : 'f');
+  }
+  printf(">\n");
+}
+
+void day20printPart1AfterZero(vector<int> after) {
+  printf("AFTER Zero Vector (Size of vector is: %lu):\n", after.size());
+
+  for (auto i=0;i<3;i++)
+    printf("[%d] = %d\n", i, after[i]);
+  for (auto i=995;i<1005;i++)
+    printf("[%d] = %d\n", i, after[i]);
+  for (auto i=1995;i<2005;i++)
+    printf("[%d] = %d\n", i, after[i]);
+  for (auto i=2995;i<3004;i++)
+    printf("[%d] = %d\n", i, after[i]);
+}
+
+void day20() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+  ingestLines("input/day20-sample.input", rawInput);
+//  ingestLines("input/day20.input", rawInput);
+
+  vector<tuple<int,bool>> enc;
+  vector<int> afterZero;
+//  afterZero.push_back(0);   // Zero is at zero.
+
+    for(auto it: rawInput) {
+      int tmp;
+      sscanf(it.c_str(), "%d", &tmp);
+      enc.push_back(make_tuple(tmp, false));
+    }
+
+  int tally=0;
+
+  int iterations=0;
+  bool bFoundZero=false;
+  bool bFirstTimeFindingZero=true;
+  bool dbg=true;
+  int simplePasses=0;
+
+  int finalValues[3] = {-999,-998,-997};
+
+  while(1) {
+    for (vector<tuple<int,bool>>::iterator it=enc.begin(); it<enc.end() ; ) {
+//      if (dbg) day20printVec("Before", iterations, enc);
+
+      if (afterZero.size()>=3004) { day20printPart1AfterZero(afterZero); exit(0); }
+
+      // Skip all of the items that have already been moved in this round.
+      // while (it!=enc.end() && get<1>(*it)==true) {
+      //   it++;
+      // }
+      for (it=enc.begin(); it!=enc.end(); it++) {
+        if (get<1>(*it)==false)
+          break;
+      }
+
+      if (it==enc.end()) {
+        printf("ITER_COUNT==%d - Got to the end of the list.\n", iterations);
+        assert(iterations==enc.size());
+
+        vector<tuple<int,bool>>::iterator it3=enc.begin();
+        if (bFoundZero && bFirstTimeFindingZero) {
+          bFirstTimeFindingZero=false;
+          // Find zero and then push entries AFTER that.
+          for (it3=enc.begin(); it3!=enc.end(); it3++)
+            if (get<0>(*it3)==0)
+              break;
+        }
+        // Now iterate through either 'the rest' of the vector or the whole vector
+        while(it3 != enc.end()) {
+          afterZero.push_back(get<0>(*it3));
+          it3++;
+        }
+
+        // Reset iteration count for next go-round.
+        iterations=0;
+        break;
+      }
+
+//      if (dbg) printf("  Beginning: focus will be %d @ [%lu]\n", get<0>(*it), it-enc.begin());
+
+      int actionValue=get<0>(*it);
+      int remainToEnd=enc.end() - it;
+      int index=it - enc.begin();
+      vector<tuple<int,bool>>::iterator lastit = enc.end();
+
+      iterations++;
+
+      if (actionValue != 0) {
+        if (lastit==it) {
+          enc.erase(it);
+          it = enc.begin();
+        }
+        else
+          it=enc.erase(it);
+      }
+      
+      // Move it.
+      if (actionValue>0) {
+        // Move forward
+        if (remainToEnd > actionValue) {
+          enc.insert(it+actionValue, make_tuple(actionValue, true));
+        }
+        else {
+          int rem = actionValue - remainToEnd + 1;
+          enc.insert(enc.begin()+rem, make_tuple(actionValue, true));
+        }
+      }
+      else if (actionValue < 0) {
+        // Move backwards
+        if (index + actionValue >= 0) {
+          if (dbg) printf("going backwards: %d from index %d\n", actionValue, index);
+          vector<tuple<int,bool>>::iterator writ = it + actionValue;
+//          printf("  New home at %d\n", get<0>(*(writ)));
+          if (index + actionValue == 0)
+            enc.push_back(make_tuple(actionValue, true));
+          else
+            enc.insert(it+actionValue, make_tuple(actionValue, true));
+        }
+        else {
+          int rem = index + actionValue;  // value(-3) and index=1 yields -2 from end
+          if (dbg) printf("going backwards with wrap(rem==%d): %d from index %d\n", rem, actionValue, index);
+          vector<tuple<int,bool>>::iterator writ = enc.end() + rem;
+//          printf("  New home at %d\n", get<0>(*writ));
+          enc.insert(writ, make_tuple(actionValue, true));
+        }
+      }
+      else {
+        // value is zero. Start counting.
+        bFoundZero = true;
+        get<1>(*it) = true;
+        it++;
+      }
+
+      if (dbg) day20printVec(" After", iterations, enc);
+
+    }
+
+    // Reset all movement flags.
+    for (auto& it2: enc) {
+      std::get<1>(it2) = false;
+//      printf("Resetting movement for: %d is now:%c\n", get<0>(*it2), get<1>(*it2) ? 't':'f');
+    }
+
+//printf("The iteration is: %d\n", iterations);
+    // simplePasses++;
+    // if (simplePasses==1000) {
+    //   printf("Exiting early. passes=%d\n", simplePasses);
+    //   exit(0);
+    // }
+    //   if (dbg) day20printVec("PRE_EXIT", enc, iterations);
+    // printf("EXITING.\n");
+    // break;
+  }
+
+  printf("Final Part 1 Tally: %d\n", tally);
+}
+
 void dayXX() {
   printf("Hello world.\n");
 
   vector<string> rawInput;
 //  ingestLines("input/day12-sample.input", rawInput);
 //  ingestLines("input/day12-sample2.input", rawInput);
-  ingestLines("input/day12.input", rawInput);
+//  ingestLines("input/day12.input", rawInput);
 
 
   int width=rawInput[0].length();
@@ -667,5 +1100,8 @@ void dayXX() {
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
-  day13();
+  // day20();
+//  day18();
+//  day13();
 }
+
