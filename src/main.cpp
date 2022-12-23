@@ -1072,6 +1072,254 @@ void day20() {
   printf("Final Part 1 Tally: %d\n", tally);
 }
 
+typedef map<string, int64_t> num_t;
+typedef map<string, string> equation_t;
+
+void day21printnumbers(const char* msg, num_t& nums) {
+  printf("%s: List of NUMBERS:\n", msg);
+  for (auto it: nums) {
+    printf("%s: %lld\n", it.first.c_str(), it.second);
+  }
+}
+
+void day21printEquations(const char* msg, equation_t& eqs) {
+  printf("%s: List of EQUATIONS:\n", msg);
+  for (auto it: eqs) {
+    printf("%s: %s\n", it.first.c_str(), it.second.c_str());
+  }
+}
+
+void day21parseEq(string& eq, string& one, char& op, string& two) {
+  char _one[10];
+  char _two[10];
+  char _op[5];
+
+  sscanf(eq.c_str(), "%s %s %s", _one, _op, _two);
+  one = _one;
+  op = _op[0];
+  two = _two;
+//  printf("PARSE source:%s  into %s %c %s\n", eq.c_str(), one.c_str(), op, two.c_str());
+}
+
+bool day21reduction(num_t& nums, equation_t& eqs) {
+  bool reduced=false;
+  string one, two;
+  char op;
+  bool dbg=false;
+
+  for (auto it=eqs.begin(); it!=eqs.end(); it++) {
+    day21parseEq(it->second, one, op, two);
+    if (one=="humn" || two=="humn")
+      continue;
+
+    if (dbg) printf("Reducing: Looking for %s or %s in numbers list.\n", one.c_str(), two.c_str());
+
+    if (nums.find(one)!=nums.end() && nums.find(two)!=nums.end()) {
+      // We found one reducible item
+      int64_t v1, v2;
+      reduced=true;
+      v1 = nums.find(one)->second;
+      v2 = nums.find(two)->second;
+      if (nums.find(it->first) != nums.end()) {
+        printf("ERROR: in Reduction: DUPLICATE FOUND for Monkey with numbers: %s\n", it->first.c_str());
+        exit(0);
+      }
+
+      switch (op) {
+        case '+':
+          nums[it->first] = v1 + v2;
+          eqs.erase(it);
+          break;
+        case '-':
+          if (v2 > v1) {
+            printf("for %s, would go negative for v1(%lld) - v2(%lld)\n", it->first.c_str(), v1, v2);
+            exit(0);
+          }
+          nums[it->first] = v1 - v2;
+          eqs.erase(it);
+          break;
+        case '*':
+          nums[it->first] = v1 * v2;
+          eqs.erase(it);
+          break;
+        case '/':
+          nums[it->first] = v1 / v2;
+          eqs.erase(it);
+          break;
+        default:
+          printf("ERROR: Reduction - bad operator of: %c\n", op);
+          exit(0);
+          break;
+      }
+
+      return reduced; // Skipping out early because we screwed up the list by deleting 'it'
+      // printf("GOT ONE.\n");
+      // exit(0);
+    }
+  }
+
+  if (dbg) printf("REDUCTION_COMPLETE.\n");
+  return reduced;
+}
+
+string day21subOut(num_t& nums, equation_t& eqs, string& in, string& toSub, string& eqOut) {
+  assert(in.find(toSub)!=std::string::npos);
+  size_t front = in.find(toSub);
+  bool dbg=true;
+  string tmp;
+
+  eqOut=""; // If number sub, this will stay as null.
+  if (dbg) printf("Subbing: In:%s - toSub:%s\n", in.c_str(), toSub.c_str());
+
+  if (eqs.find(toSub)!=eqs.end()) {
+    // Substitute another equation here.
+    tmp = in.substr(0,front) + "(";
+    tmp += eqs[toSub];
+    tmp += ")";
+    tmp += in.substr(front+4);
+    eqOut=eqs[toSub];
+  }
+  else {
+    // Substitute a number
+    assert(nums.find(toSub)!=nums.end());
+    char tmp2[20];
+    snprintf(tmp2, 20, "%lld", nums[toSub]);
+
+    tmp = in.substr(0,front) + tmp2;
+    tmp += in.substr(front+4);
+  }
+
+  if (dbg) printf("Subbing: OUT:%s\n", tmp.c_str());
+  return tmp;
+}
+
+void day21sub(num_t& nums, equation_t& eqs, string& subRoot) {
+  string one, two;
+  string eqOutOne;
+  char op;
+  string out="(";
+
+  day21parseEq(eqs[subRoot], one, op, two);
+  out += eqs[subRoot];
+  out += ")";
+  printf("SUB: Starting sub of %s - one(%s), two(%s)\n", out.c_str(), one.c_str(), two.c_str());
+
+  assert(nums.find(subRoot)==nums.end());
+
+  vector<string> subList;
+  subList.push_back(one);
+  subList.push_back(two);
+
+  while (subList.size()) {
+    out = day21subOut(nums, eqs, out, subList.back(), eqOutOne);
+    subList.pop_back();
+
+    if (eqOutOne!="") {
+      day21parseEq(eqOutOne, one, op, two);
+      if (one != "humn")
+        subList.push_back(one);
+      if (two != "humn")
+        subList.push_back(two);
+    }
+
+    // if (one=="humn" || two=="humn") {
+    //   printf("Found HUMN - size of remaining vector is: %lu\n", subList.size());
+    //   break;
+    // }
+  }
+
+}
+
+void day21() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day21-sample.input", rawInput);
+//  ingestLines("input/day21-sample2.input", rawInput);
+  ingestLines("input/day21.input", rawInput);
+
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  char monkey[5];
+  string valueStr;
+  int value;
+  num_t numbers;
+  equation_t equations;
+  string name;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+      // Read next instruction.
+      sscanf(rawInput[i].c_str(), "%s", monkey);
+      monkey[4] = 0; // trim off ":"
+      name = monkey;
+      valueStr = &rawInput[i][6];
+
+      if (sscanf(valueStr.c_str(), "%d", &value)==1) {
+        // Make sure there's NOT already one of these.
+        printf("Processing Monkey:%s with a number of %d\n", name.c_str(), value);
+        if (numbers.find(name) != numbers.end()) {
+          printf("ERROR: DUPLICATE FOUND for Monkey with numbers: %s\n", name.c_str());
+          exit(0);
+        }
+        numbers[name] = value;
+      }
+      else {
+        // Make sure there's NOT already one of these.
+        printf("Processing Monkey:%s with an equation of %s\n", name.c_str(), valueStr.c_str());
+        if (equations.find(name) != equations.end()) {
+          printf("ERROR: DUPLICATE FOUND for Monkey with an equation: %s\n", name.c_str());
+          exit(0);
+        }
+        equations[name] = valueStr;
+      }
+  }
+
+  day21printnumbers("START", numbers);
+  day21printEquations("START", equations);
+
+  // Collapse any equations to a value and then do it again until we're down to name-recursion-items
+  while (day21reduction(numbers, equations))
+    ;
+
+  // day21printnumbers("REDUCED", numbers);
+  // day21printEquations("REDUCED", equations);
+
+  // printf("ddzt: ssgd(%lld) * ntvz(%lld)\n", numbers["ssgd"], numbers["ntvz"]);
+  // printf("rmtp: sczz(%lld) * nsgb(%lld)\n", numbers["sczz"], numbers["nsgb"]);
+  // printf("root: ddzt(%lld) + rmtp(%lld)\n", numbers["ddzt"], numbers["rmtp"]);
+  // printf("Final Part 1 Tally: %lld\n", numbers["root"]);
+  // -98997638 was wrong
+  // Part 1 - answer: 256997859093114  (using int64_t)
+
+  // Part 2 - solve (6 * (29958372186126 - (((3 * (((783 + ((((210 + (3 * ((((((((((((2 * (((((((892 + ((((((((208 + (((26 * ((((2 * (((((((638 + ((((((((((693 + ((humn - 898) * 24)) / 9) - 914) * 9) + 765) / 2) - 172) / 5) + 557) * 7)) * 2) - 916) / 6) - 350) / 3) + 585)) + 540) / 8) - 121)) - 668) * 2)) / 6) + 598) / 8) - 730) * 57) - 327) / 6)) * 6) - 537) / 3) + 116) * 3) - 717)) + 481) + 676) / 5) + 53) / 6) - 506) * 7) - 600) + 255) / 2) + 585))) * 2) - 384) / 2)) / 2) - 570)) + 397) / 7)))=77247625979730
+  // 3952288690726
+  string one, two;
+  char op1;
+  day21parseEq(equations["root"], one, op1, two);
+
+  string subRoot;
+  int64_t valueRoot;
+  if (numbers.find(one)!=numbers.end()) {
+    valueRoot = numbers[one];
+    assert(valueRoot!=0);
+    subRoot = two;
+    printf("ROOT = %lld %c %s\n", valueRoot, op1, subRoot.c_str());
+  }
+  else {
+    assert(numbers.find(two)!=numbers.end());
+    valueRoot = numbers[two];
+    subRoot = one;
+    printf("ROOT = %s %c %lld\n", subRoot.c_str(), op1, valueRoot);
+  }
+  day21sub(numbers, equations, subRoot);
+  printf("SUB-OUTPUT: %s\n", subRoot.c_str());
+}
+
 void dayXX() {
   printf("Hello world.\n");
 
@@ -1100,6 +1348,7 @@ void dayXX() {
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
+  day21();
   // day20();
 //  day18();
 //  day13();
