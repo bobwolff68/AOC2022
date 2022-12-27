@@ -9,6 +9,7 @@
 #include <map>
 #include <set>
 #include <queue>
+#include <cmath>
 #include <assert.h>
 
 #define SleepMS(x)  (std::this_thread::sleep_for(std::chrono::milliseconds((x))))
@@ -1320,14 +1321,208 @@ void day21() {
   printf("SUB-OUTPUT: %s\n", subRoot.c_str());
 }
 
-void dayXX() {
+typedef vector<pair<int, int>> d23_t;
+d23_t elvesCurrent;
+d23_t elvesProposed;
+int d23minx, d23maxx, d23miny, d23maxy;
+enum d23_dir {North, South, West, East};
+d23_dir curDir=North;
+
+void day23calcBounding() {
+  bool dbg=true;
+  assert(elvesCurrent.size() != 0);
+  d23minx=elvesCurrent[0].first;
+  d23maxx=elvesCurrent[0].first;
+  d23miny=elvesCurrent[0].second;
+  d23maxy=elvesCurrent[0].second;
+
+  for (auto it: elvesCurrent) {
+    if (it.first<d23minx) d23minx=it.first;
+    if (it.first>d23maxx) d23maxx=it.first;
+    if (it.second<d23miny) d23miny=it.second;
+    if (it.second>d23maxy) d23maxy=it.second;
+  }
+  if (dbg) printf("Bounding: #Elves:%lu - MinX=%d, MaxX=%d, MinY=%d, MaxY=%d\n", elvesCurrent.size(), d23minx, d23maxx, d23miny, d23maxy);
+}
+
+bool day23isPresentAt(int x, int y) {
+  for (auto it: elvesCurrent) {
+    if (it.first==x && it.second==y)
+      return true;
+  }
+  return false;
+}
+
+bool day23isAllAloneAt(int x, int y) {
+  assert(day23isPresentAt(x,y));
+
+  if (day23isPresentAt(x-1,y-1) || day23isPresentAt(x,y-1) || day23isPresentAt(x+1,y-1) ||
+      day23isPresentAt(x-1,y) || day23isPresentAt(x+1,y) ||
+      day23isPresentAt(x-1,y+1) || day23isPresentAt(x,y+1) || day23isPresentAt(x+1,y+1))
+        return false;
+
+  return true;
+}
+
+int day23getEmptySpaces() {
+  day23calcBounding();
+  return (d23maxx-d23minx+1)*(d23maxy-d23miny+1) - elvesCurrent.size();
+  // int emptySpaces=(d23maxx-d23minx+1)*(d23maxy-d23miny+1);  // Start with no one anywhere.
+  // for (auto y=d23miny; y<=d23maxy; y++) {
+  //   for (auto x=d23minx; x<=d23maxx; x++) {
+  //     if (day23isPresentAt(x,y))
+  //       emptySpaces--;
+  //   }
+  // }  
+  // return emptySpaces;
+}
+
+void day23printCurrent(const char* msg) {
+  printf("[%s] The Grove currently looks like this:\n", msg);
+  day23calcBounding();
+  for (auto y=d23miny-1; y<=d23maxy+1; y++) {
+    for (auto x=d23minx-1; x<=d23maxx+1; x++) {
+      if (day23isPresentAt(x,y))
+        printf("#");
+      else
+        printf(".");
+    }
+    printf("\n");
+  }  
+}
+
+int day23getIndexFor(d23_t& theList, int x, int y) {
+  for (d23_t::iterator it=theList.begin(); it!=theList.end(); it++) {
+    if (it->first==x && it->second==y)
+      return it-theList.begin();
+  }
+  return -1;
+}
+
+void day23backOutProposalAt(int x, int y) {
+  // Find x,y in the proposed list.
+  //   Then figure the index and use that index in the current list to get the prior value.
+  //   Use the prior value to change the current proposal.
+  d23_t::iterator itProp = elvesProposed.begin();
+  while (itProp != elvesProposed.end()) {
+    if (itProp->first==x && itProp->second==y) {
+      itProp->first  = elvesCurrent[itProp-elvesProposed.begin()].first;
+      itProp->second = elvesCurrent[itProp-elvesProposed.begin()].second;
+      return;
+    }
+
+    itProp++;
+  }
+
+  printf("ERROR: Backing out proposal at (%d, %d) failed. Not found.\n", x, y);
+  exit(0);
+}
+
+//
+// 
+// The proposed list MIRRORS the current list. 
+//   Each elf either moves or stays put - so if we do need to back out, we can.
+//
+//
+void day23makeProposalAt(int x, int y) {
+  bool dbg=false;
+  d23_dir dirTry = curDir;
+  int triesRemaining=4;
+  static vector<string> directions { "North", "South", "West", "East"};
+  int pX, pY;
+  bool bProposed=false;
+
+  if (day23isAllAloneAt(x, y)) {
+    if (dbg) printf("   Proposal: All alone - no movement for (%d, %d)\n", x, y);
+    elvesProposed.push_back(make_pair(x, y));
+    return;
+  }
+
+  while (triesRemaining--) {
+//    if (dbg) printf("   Proposal: For (%d, %d) - trying direction: %s\n", x, y, directions[int(dirTry)].c_str());
+    switch(dirTry) {
+      case North:
+        if (!day23isPresentAt(x-1, y-1) && !day23isPresentAt(x, y-1) && !day23isPresentAt(x+1, y-1)) {
+          bProposed=true;
+          pX = x;
+          pY = y-1;
+        }
+        else
+          dirTry = South;
+        break;
+      case South:
+        if (!day23isPresentAt(x-1, y+1) && !day23isPresentAt(x, y+1) && !day23isPresentAt(x+1, y+1)) {
+          bProposed=true;
+          pX = x;
+          pY = y+1;
+        }
+        else
+          dirTry = West;
+        break;
+      case West:
+        if (!day23isPresentAt(x-1, y-1) && !day23isPresentAt(x-1, y) && !day23isPresentAt(x-1, y+1)) {
+          bProposed=true;
+          pX = x-1;
+          pY = y;
+        }
+        else
+          dirTry = East;
+        break;
+      case East:
+        if (!day23isPresentAt(x+1, y-1) && !day23isPresentAt(x+1, y) && !day23isPresentAt(x+1, y+1)) {
+          bProposed=true;
+          pX = x+1;
+          pY = y;
+        }
+        else
+          dirTry = North;
+        break;
+    }
+
+    if (bProposed) {
+      // Need to figure if there's a collision or not
+      if (day23getIndexFor(elvesProposed, pX, pY)!=-1) {
+        // Need to back out.
+        if (dbg) printf(" ALERT: Backing out proposal for collision at (%d, %d)\n", pX, pY);
+        day23backOutProposalAt(pX, pY);
+        // Now don't move the current one.
+        elvesProposed.push_back(make_pair(x, y));
+        return;
+      }
+      else {
+        elvesProposed.push_back(make_pair(pX,pY));
+        if (dbg) printf("   Proposal-%s: Elf @ (%d, %d) moving to (%d, %d)\n", directions[int(dirTry)].c_str(), x, y, pX, pY);
+        return;
+      }
+    }
+  }
+
+// If we drop out the bottom, then by definition our proposed location is not moving.
+  if (dbg) printf("   Proposal: Unable to move - no movement for (%d, %d)\n", x, y);
+  elvesProposed.push_back(make_pair(x, y));
+
+}
+
+void day23doProposals() {
+  bool dbg=false;
+  int dbgCount=0;
+  elvesProposed.clear();
+
+  for (auto it: elvesCurrent) {
+    if (dbg) printf("Proposal being prepped at (%d, %d)\n", it.first, it.second);
+    day23makeProposalAt(it.first, it.second);
+//    if (dbgCount++ == 2) exit(0);
+  }
+}
+
+void day23() {
   printf("Hello world.\n");
 
   vector<string> rawInput;
-//  ingestLines("input/day12-sample.input", rawInput);
-//  ingestLines("input/day12-sample2.input", rawInput);
-//  ingestLines("input/day12.input", rawInput);
-
+//  ingestLines("input/day23-sample0.input", rawInput);
+//  ingestLines("input/day23-sample.input", rawInput);
+//  ingestLines("input/day23-sample2.input", rawInput);
+  ingestLines("input/day23.input", rawInput);
 
   int width=rawInput[0].length();
   int height=rawInput.size();
@@ -1336,19 +1531,401 @@ void dayXX() {
 
   int quantity, from, to;
 
-//  for (auto i=0; i<rawInput.size(); i++) {
-  for (auto i=0; i<5; i++) {
-      // Read next instruction.
-//        sscanf(rawInput[line].c_str(), "%s %d", charCmd, &operand);
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+    for (auto col=0; col<width; col++) {
+      if (rawInput[i][col]=='#')
+        elvesCurrent.push_back(make_pair(col, i));
+    }
+//        sscanf(rawInput[i].c_str(), "%s %d", charCmd, &operand);
+  }
+
+  day23printCurrent("START");
+  for (auto i=0; i<10000; i++) {
+    printf("ROUND #%d starting. #Elves:%lu Default direction is:%d\n", i+1, elvesCurrent.size(), int(curDir));
+//  if (i==2) propExit=true;
+    day23doProposals();
+    if (elvesCurrent == elvesProposed) {
+      printf("***NO CHANGES*** - Round#%d\n", i+1);
+      exit(0);
+    }
+    elvesCurrent = elvesProposed;
+//    day23printCurrent("POST-PROPOSALs");
+    day23calcBounding();
+    printf("ROUND #%d END - #Elves:%lu Number of empty spaces: %d\n", i+1, elvesCurrent.size(), day23getEmptySpaces());
+    curDir = d23_dir((int(curDir) + 1) % 4);
+//  if (i==4) exit(0);
+  }
+
+  printf("Final Part 1 # of empty spaces: %d\n", day23getEmptySpaces());
+  // Part 1 answer - 4208
+}
+
+typedef vector<tuple<int, int, char>> d24_t;
+d24_t blizzards;
+typedef vector<vector<char>> d24map_t;
+d24map_t expeditionMap;
+static int entranceCol=-1;
+static int exitCol=-1;
+static int EmapWidth=-1;
+static int EmapHeight=-1;
+pair<int, int> E {-1, -1};
+
+int day24getEntryAt(int x, int y, char& v) {
+  int qty=0;
+
+  if (x < 0 || x >= EmapWidth || y < 0 || y >= EmapHeight)
+    return -1;
+
+  for (auto it: blizzards) {
+    if (get<0>(it)==x && get<1>(it)==y) {
+      qty++;
+      v = get<2>(it);
+    }
+  }
+
+  if (qty>1)
+    v = '0' + qty;
+  return qty;
+}
+
+void day24makeMap() {
+  vector<char> row;
+  expeditionMap.clear();
+  
+  for (auto y=0; y<EmapHeight; y++) {
+    row.clear();
+    for (auto x=0; x<EmapWidth; x++) {
+      char entry;
+      int qty = day24getEntryAt(x,y,entry);
+
+      if (E.first==x && E.second==y)
+        row.push_back('E');
+      else if (qty > 0)
+        row.push_back(entry);
+      else
+        row.push_back('.');
+    }
+    expeditionMap.push_back(row);
+  }  
+}
+
+void day24printmap(const char* msg) {
+  printf("[%s] The Expedition Map currently looks like this:\n", msg);
+  day24makeMap();
+
+  if (E.first==-1) {
+    for (auto c=0; c<entranceCol; c++)
+      printf(" ");
+    printf("E\n");
+  }
+
+  for (auto y=0; y<EmapHeight; y++) {
+    for (auto x=0; x<EmapWidth; x++) {
+      printf("%c", expeditionMap[y][x]);
+    }
+    printf("\n");
+  }  
+
+  for (auto c=0; c<exitCol; c++)
+    printf(" ");
+  printf("X\n");
+
+}
+
+void day24moveBlizzards() {
+  for (auto& it: blizzards) {
+    char direction = get<2>(it);
+    int x = get<0>(it);
+    int y = get<1>(it);
+    switch(direction) {
+      case '^':
+        y--;
+        if (y==-1) y=EmapHeight-1;
+        break;
+      case 'v':
+        y++;
+        if (y==EmapHeight) y=0;
+        break;
+      case '<':
+        x--;
+        if (x==-1) x=EmapWidth-1;
+        break;
+      case '>':
+        x++;
+        if (x==EmapWidth) x=0;
+        break;
+      default:
+        printf("ERROR: Bad blizzard type of:%c\n", direction);
+        exit(0);
+        break;
+    }
+    get<0>(it) = x;
+    get<1>(it) = y;
+  }
+}
+
+void day24getMoveCandidates(vector<pair<int,int>>& cand) {
+  char c;
+  cand.clear();
+  if (E.first==-1) {
+    // Only 'wait' and down are even possible.
+    cand.push_back(make_pair(-1,-1));   // Special response for 'wait'
+    if (day24getEntryAt(entranceCol, 0, c)==0)
+      cand.push_back(make_pair(entranceCol, 0));
+  }
+  else if (E.second==EmapHeight-1 && E.first==exitCol) {
+    // This is the *END* - one move gets us out.
+    cand.push_back(make_pair(-2, -2));
+    return;
+  }
+  else {
+    // U/D/L/R or wait
+    // Up
+    if (day24getEntryAt(E.first, E.second-1, c)==0)
+      cand.push_back(make_pair(E.first, E.second-1));
+    // Down
+    if (day24getEntryAt(E.first, E.second+1, c)==0)
+      cand.push_back(make_pair(E.first, E.second+1));
+    // Left
+    if (day24getEntryAt(E.first-1, E.second, c)==0)
+      cand.push_back(make_pair(E.first-1, E.second));
+    // Right
+    if (day24getEntryAt(E.first+1, E.second, c)==0)
+      cand.push_back(make_pair(E.first+1, E.second));
+    // Wait
+    if (day24getEntryAt(E.first, E.second, c)==0)
+      cand.push_back(make_pair(E.first, E.second));
+  }
+}
+
+void day24() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day24-sample.input", rawInput);
+  ingestLines("input/day24-sample2.input", rawInput);
+//  ingestLines("input/day24.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  int quantity, from, to;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<5; i++) {
+    for (auto col=0; col<width; col++) {
+      if (i==0) {
+        // Looking for the entrance.
+        if (rawInput[i][col]=='.')
+          entranceCol = col-1;
+      }
+      else if (i==height-1) {
+        // Looking for the entrance.
+        if (rawInput[i][col]=='.')
+          exitCol = col-1;
+      }
+      else if (rawInput[i][col]!='#' && rawInput[i][col]!='.')
+        blizzards.push_back(make_tuple(col-1, i-1, rawInput[i][col]));
+    }
+  }
+
+  assert(entranceCol != -1);
+  assert(exitCol != -1);
+  EmapWidth = width-2;
+  EmapHeight = height-2;
+
+  printf("Map width:%d, height:%d and # of blizzards at start: %lu\n", EmapWidth, EmapHeight, blizzards.size());
+
+  day24printmap("START");
+
+  vector<pair<int,int>> cand;
+
+  for (auto iter=0; iter<7; iter++) {
+    day24moveBlizzards();
+    day24getMoveCandidates(cand);
+    printf("From E(%d,%d) Received %lu candidate pairs\n", E.first, E.second, cand.size());
+    if (cand.size() && cand[0].first==-2) {
+      printf("PART 2 ENDING - Total rounds: %d\n", iter+2);
+      exit(0);
+    }
+//    exit(0);
+    day24printmap("IN_PROC");
+//    SleepMS(1000);
   }
 
   printf("Final Part 1 Tally: %d\n", tally);
 }
 
+#define MAXDIGITS 22
+
+map<char, int> snToReg { {'2',2}, {'1',1}, {'0', 0}, {'-',-1}, {'=',-2}};
+map<int, char> regToSN { {2, '2'}, {1, '1'}, {0, '0'}, {-1, '-'}, {-2, '='}};
+
+int64_t placeValue(int place) {
+  int64_t v = pow(5, place);
+  return v;
+}
+
+int64_t maxValue(int place, int digit=2) {
+  return placeValue(place) * digit;  // We don't have higher digits than 2.
+}
+
+// This is kinda fuzzy at the moment
+// The max value at place 5 is 2*3125=6250
+// But if place 5 is '2' and place 4 is NEGATIVE ... -2, does this inform us?
+// Or really a minimum might be '1' in place 5 and -2 in place 4
+int64_t minValue(int place, int digit=-2) {
+  return placeValue(place) * digit;  // We don't have higher digits than 2.
+}
+
+int64_t toDec(string& in) {
+  int place=0;
+  int64_t pvals[MAXDIGITS];
+  int64_t sum=0;
+  bool dbg=false;
+
+  for (auto x=0;x<MAXDIGITS;x++) pvals[x]=0;
+
+  for (int i=in.length()-1; i>=0; i--) {
+    // Process this place.
+    if (dbg) printf("toDec: i=%d, place=%d, in[i]=%c, sntoReg=%d\n", i, place, in[i], snToReg[in[i]]);
+    pvals[place] = placeValue(place) * snToReg[in[i]];
+    place++;
+  }
+
+//exit(0);
+  for (auto x=0; x<MAXDIGITS; x++) sum += pvals[x];
+
+  if (dbg) {
+    printf("Digit translations:\n");
+    for (auto x=0; x<in.length(); x++) {
+      char c = in[in.length()-1-x];
+      printf("%c @ place:%d becomes %d*%lld = %lld\n", c, x, snToReg[c], placeValue(x), pvals[x]);
+    }
+  }
+
+  return sum;
+}
+
+string toSNAFU(int64_t indec) {
+  int place;
+  int64_t curval = indec;
+  string out="";
+  bool dbg=true;
+
+  for (place=MAXDIGITS-1; place>0; place--) {
+    int64_t tmpval;
+    int digit;
+    if (dbg) printf("Looking at place: %d, curval=%lld, placeValue=%lld\n", place, curval, placeValue(place));
+    if (curval >= placeValue(place)) {
+      // Time to do something in this place.
+      digit = curval / placeValue(place);
+      tmpval = curval - digit * placeValue(place);
+      if (tmpval > maxValue(place-1)) {
+        // next digit cannot represent with '2' even so we'll have to bump this one
+        digit++;
+        tmpval = curval - digit * placeValue(place);
+      }
+      out += char('0'+digit);
+      if (dbg) printf("  curval=%lld, placeValue@place=%lld, curval after=%lld, output:%s\n", curval, placeValue(place), tmpval, out.c_str());
+      curval = tmpval;
+if (place==2) exit(0);
+    }
+    else if (curval < 0) {
+      digit = curval / placeValue(place);
+      tmpval = curval - digit * placeValue(place);
+      if (tmpval < -2*maxValue(place-1)) {
+        digit--;
+        tmpval = curval - digit * placeValue(place);
+      }
+      out += regToSN[digit];
+      if (dbg) printf("  NEGATIVE:  curval=%lld, placeValue@place=%lld, curval after=%lld, output:%s\n", curval, placeValue(place), tmpval, out.c_str());
+      curval = tmpval;
+//if (place==3) exit(0);
+    }
+  }
+
+  return out;
+}
+
+void day25() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+  ingestLines("input/day25-sample.input", rawInput);
+//  ingestLines("input/day25.input", rawInput);
+
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int64_t tally=0;
+  string trySnafu;
+
+  printf("TEST of VALUE ranges:\n");
+  printf(" Place value for place 5 is %lld\n", placeValue(5));
+  printf(" Place value for place 4 is %lld\n", placeValue(4));
+  printf(" MAX at place 5 alone is '200000' = %lld\n", 2*placeValue(5));
+  printf(" MAX at place2 5&4 is '220000' = %lld\n", 2*placeValue(5)+2*placeValue(4));
+  printf(" Place 5 can be modified DOWN by place 4 %lld or %lld\n", -1*placeValue(4), -2*placeValue(4));
+  trySnafu="200000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="200000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="2-0000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="2=0000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="2=====";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="122222";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="100000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="1-0000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="1=0000";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  trySnafu="1=====";
+  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
+  printf(" MAX at place 5 with alone is '2' = %lld\n", 2*placeValue(5));
+  exit(0);
+
+  printf("base-5 place values:\n");
+  for (auto i=0;i<MAXDIGITS;i++)
+    printf("%d : %lld\n", i, placeValue(i));
+  printf("base-5 MAXIMUM values for a place '2':\n");
+  for (auto i=0;i<MAXDIGITS;i++)
+    printf("%d : %lld\n", i, maxValue(i));
+
+assert(width <= MAXDIGITS);
+
+  // for (char c='2'; c>= '0'; c--)
+  //   printf("Translate: %c = %d\n", c, snToReg[c]);
+  // printf("Translate: %c = %d\n", '-', snToReg['-']);
+  // printf("Translate: %c = %d\n", '=', snToReg['=']);
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<1; i++) {
+    int64_t dec = toDec(rawInput[i]);
+    printf("Converting: %s becomes %lld\n", rawInput[i].c_str(), dec);
+    tally += dec;
+  }
+
+  printf("Final Part 1 SNAFU to decimal Tally: %lld\n", tally);
+
+  string snafu = toSNAFU(tally);
+
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
-  day21();
+  day25();
+//  day24();
   // day20();
 //  day18();
 //  day13();
