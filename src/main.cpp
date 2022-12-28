@@ -1781,6 +1781,32 @@ int64_t minValue(int place, int digit=-2) {
   return placeValue(place) * digit;  // We don't have higher digits than 2.
 }
 
+void bumpUpAndCascade(string& curOut, int place) {
+  bool dbg=true;
+
+  for (int ch=curOut.length()-1-place; ch<MAXDIGITS; ch--) {
+    if (dbg) printf("BUMPing place:%d for input:%s\n", ch, curOut.c_str());
+    if (curOut[ch] == '=')
+      curOut[ch] = '-';
+    else if (curOut[ch] == '-')
+      curOut[ch] = '0';
+    else if (curOut[ch] == '0' || curOut[ch] == '1')
+      curOut[ch]++;
+    else {
+      // place is already '2' and cannot become '3' so it becomes -2
+      // and forces the next entry to bump up.
+      assert(curOut[ch] == '2');
+      curOut[ch] = '=';
+      if (dbg) printf("  BUMPing cascading...\n");
+      continue; // Go again. Bump up the next one due to this one going negative.
+    }
+
+    break; // All done
+  }
+
+  if (dbg) printf("  BUMPing complete. Result: %s\n", curOut.c_str());
+}
+
 int64_t toDec(string& in) {
   int place=0;
   int64_t pvals[MAXDIGITS];
@@ -1816,38 +1842,40 @@ string toSNAFU(int64_t indec) {
   string out="";
   bool dbg=true;
 
+  for (auto i=0; i<MAXDIGITS; i++)
+    out += "0";
+
   for (place=MAXDIGITS-1; place>0; place--) {
-    int64_t tmpval;
     int digit;
+    int index=out.length()-1-place;
     if (dbg) printf("Looking at place: %d, curval=%lld, placeValue=%lld\n", place, curval, placeValue(place));
     if (curval >= placeValue(place)) {
       // Time to do something in this place.
       digit = curval / placeValue(place);
-      tmpval = curval - digit * placeValue(place);
-      if (tmpval > maxValue(place-1)) {
-        // next digit cannot represent with '2' even so we'll have to bump this one
-        digit++;
-        tmpval = curval - digit * placeValue(place);
+      if (digit == 3) {
+        out[index] = '='; // Converting to -2
+        bumpUpAndCascade(out, place+1);
       }
-      out += char('0'+digit);
-      if (dbg) printf("  curval=%lld, placeValue@place=%lld, curval after=%lld, output:%s\n", curval, placeValue(place), tmpval, out.c_str());
-      curval = tmpval;
-if (place==2) exit(0);
-    }
-    else if (curval < 0) {
-      digit = curval / placeValue(place);
-      tmpval = curval - digit * placeValue(place);
-      if (tmpval < -2*maxValue(place-1)) {
-        digit--;
-        tmpval = curval - digit * placeValue(place);
+      else if (digit == 4) {
+        out[index] = '-'; // Converting to -1
+        bumpUpAndCascade(out, place+1);
       }
-      out += regToSN[digit];
-      if (dbg) printf("  NEGATIVE:  curval=%lld, placeValue@place=%lld, curval after=%lld, output:%s\n", curval, placeValue(place), tmpval, out.c_str());
-      curval = tmpval;
-//if (place==3) exit(0);
+      else {
+        out[index] = char('0'+digit);
+      }
+
+      curval = curval - digit * placeValue(place);
+      if (dbg) printf("  curval=%lld current output:%s\n", curval, out.c_str());
+//if (place==2) exit(0);
     }
   }
 
+  // Trim off the leading zeros.
+  auto loc = out.find_first_not_of('0');
+  if (loc != std::string::npos)
+    out.substr(loc);
+  
+  if (dbg) printf("  FINAL out string is:%s\n", out.c_str());
   return out;
 }
 
@@ -1855,8 +1883,8 @@ void day25() {
   printf("Hello world.\n");
 
   vector<string> rawInput;
-  ingestLines("input/day25-sample.input", rawInput);
-//  ingestLines("input/day25.input", rawInput);
+//  ingestLines("input/day25-sample.input", rawInput);
+  ingestLines("input/day25.input", rawInput);
 
 
   int width=rawInput[0].length();
@@ -1865,41 +1893,9 @@ void day25() {
   int64_t tally=0;
   string trySnafu;
 
-  printf("TEST of VALUE ranges:\n");
-  printf(" Place value for place 5 is %lld\n", placeValue(5));
-  printf(" Place value for place 4 is %lld\n", placeValue(4));
-  printf(" MAX at place 5 alone is '200000' = %lld\n", 2*placeValue(5));
-  printf(" MAX at place2 5&4 is '220000' = %lld\n", 2*placeValue(5)+2*placeValue(4));
-  printf(" Place 5 can be modified DOWN by place 4 %lld or %lld\n", -1*placeValue(4), -2*placeValue(4));
-  trySnafu="200000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="200000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="2-0000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="2=0000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="2=====";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="122222";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="100000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="1-0000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="1=0000";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  trySnafu="1=====";
-  printf(" %s = %lld\n", trySnafu.c_str(), toDec(trySnafu));
-  printf(" MAX at place 5 with alone is '2' = %lld\n", 2*placeValue(5));
-  exit(0);
-
   printf("base-5 place values:\n");
   for (auto i=0;i<MAXDIGITS;i++)
     printf("%d : %lld\n", i, placeValue(i));
-  printf("base-5 MAXIMUM values for a place '2':\n");
-  for (auto i=0;i<MAXDIGITS;i++)
-    printf("%d : %lld\n", i, maxValue(i));
 
 assert(width <= MAXDIGITS);
 
@@ -1917,6 +1913,7 @@ assert(width <= MAXDIGITS);
 
   printf("Final Part 1 SNAFU to decimal Tally: %lld\n", tally);
 
+  // Part 1 re-conversion answer is 2-20=01--0=0=0=2-120
   string snafu = toSNAFU(tally);
 
 }
@@ -1924,7 +1921,6 @@ assert(width <= MAXDIGITS);
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
-  day25();
 //  day24();
   // day20();
 //  day18();
