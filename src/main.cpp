@@ -1918,12 +1918,359 @@ assert(width <= MAXDIGITS);
 
 }
 
+using grid_t = vector<string>;
+grid_t grid;
+string instructions;
+static int direction=0;  // 0=Right, 1=Down, 2=Left, 3=Right
+pair<int, int> location;
+int gridWidth;
+int gridHeight;
+
+void setInitLocation() {
+  location.second = 0;  // Y = 0;
+  location.first=grid[0].find_first_not_of(' ');
+}
+
+pair<int,int> mods[4] = {{1,0}, {0, 1}, {-1, 0}, {0, -1}};
+char dirs[4] = {'>', 'v', '<', '^'};
+
+void MoveIt(int dist) {
+  bool dbg=false;
+  int x, y;
+  if (dbg) printf("MoveIt: From location (%d, %d) go %c by %d spots.\n", location.first, location.second, dirs[direction], dist);
+  for (auto i=0; i<dist; i++) {
+    x = location.first  + mods[direction].first;
+    y = location.second + mods[direction].second;
+
+    // Clear x,y as in bounds and wrapping.
+    switch (direction) {
+      case 0: // Right
+        if (x >= gridWidth || grid[y][x] == ' ') {
+          // Need to wrap and cope with leading spaces to get back on the map.
+          x = grid[y].find_first_not_of(' ');
+        }
+        break;
+      case 1: // Down
+        if (y >= gridHeight || grid[y][x]==' ') {
+          // Need to wrap ROWS which can't be done without iterating through each row looking for non-space entries
+          for (y = 0; y<location.second; y++)
+            if (grid[y][x] != ' ')
+              break;
+        }
+        break;
+      case 2: // Left
+        if (x==-1 || grid[y][x]==' ')
+          x = grid[y].find_last_not_of(' ');
+        if (dbg) printf("  WRAP_LEFT: New X position will be:%d with '%c' in that location.\n", x, grid[y][x]);
+        break;
+      case 3: // Up
+        if (y==-1 || grid[y][x]==' ') {
+          // Need to wrap 
+          for (y = gridHeight-1; y>location.second; y--)
+            if (grid[y][x] != ' ')
+              break;
+        }
+        break;
+    }
+
+    // Decide if we advance to this new x,y based on what is in that location
+    if (grid[y][x] != '#') {
+      grid[y][x] = dirs[direction]; // Put a <>^v in the spot
+      location.first = x;
+      location.second = y;
+      if (dbg) printf("  MoveIt: @ dist=%d we did move to a new location (%d, %d).\n", i, x, y);
+    }
+    else
+      if (dbg) printf("  MoveIt: @ dist=%d, didn't move since new location (%d, %d) would be '%c'\n", i, x, y, grid[y][x]);
+  }
+}
+
+void day22() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day22-sample.input", rawInput);
+  ingestLines("input/day22.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  for (auto i=0; i<rawInput.size(); i++) {
+//  for (auto i=0; i<1; i++) {
+    if (rawInput[i].length()==0)
+      break;
+    grid.push_back(rawInput[i]);
+    if (rawInput[i].length() > width)
+      width = rawInput[i].length();
+  }
+
+  // Pad every grid line out to width.
+  for (auto row=0; row<grid.size(); row++)
+    while(grid[row].length() < width)
+      grid[row] += " ";
+
+  gridWidth = width;
+  gridHeight = height - 2;
+  printf("Grid ingested. Width=%d, Height=%d\n", gridWidth, gridHeight);
+
+  instructions = rawInput[height-1];
+  assert(instructions.length() != 0);
+  printf("Instructions are: %s\n", instructions.c_str());
+
+  setInitLocation();
+  printf("Initial location is: (%d, %d)\n", location.first, location.second);
+
+  int pos=0;
+  while (pos < instructions.length()) {
+    int dist;
+    sscanf(instructions.c_str()+pos, "%d", &dist);
+    while (instructions[pos]>='0' && instructions[pos]<='9') {
+      pos++;
+    }
+
+    char relDir=instructions[pos++];
+    printf("Dir=%d: Go %d spaces and then turn '%c'\n", direction, dist, relDir);
+
+    MoveIt(dist);
+
+    if (pos==instructions.length())
+      break;
+
+    if (relDir=='R') {
+      direction = (direction + 1) % 4;
+    }
+    else if (relDir=='L') {
+      if (direction==0)
+        direction=3;
+      else
+        direction--;
+    }
+    else
+      printf("ERROR: BAD direction of: %c\n", relDir);
+//if (pos > 12) exit(0);
+  }
+
+  // NOTE: Final location is (location.first+1, location.second+1)
+  printf("Final location is at (%d, %d)\n", location.first, location.second);
+  tally = 1000 * (location.second+1) + 4 * (location.first+1) + direction;
+
+  // Part 1 answer: 56372
+  printf("Final Part 1 Tally: %d\n", tally);
+
+}
+
+string gasses;
+vector<string> chamber;
+const int MAXROCKS=5;
+typedef struct aRock { 
+  vector<string> rockData; 
+  int width; 
+  int height;
+} aRock_t;
+
+aRock_t rocks[MAXROCKS] = {{{"@@@@"}, 4, 1}, {{".@.","@@@",".@."}, 3, 3}, {{"..@","..@","@@@"}, 3, 3},
+                        {{"@", "@", "@", "@"}, 1, 4}, {{"@@", "@@"}, 2, 2}};
+static int currentRock=0;
+static int currentGasEntry=0;
+int rockX, rockY;
+
+void day17printChamber(const char* msg, int nrx, int nry, int round, bool bPrintRock=true) {
+  bool dbg=false;
+  printf("%s: Chamber View @ Round:%d\n", msg, round);
+  if (dbg) printf(" RockX=%d, RockY=%d, thisRockWidth=%d, thisRockHeight=%d\n", nrx, nry, rocks[currentRock].width, rocks[currentRock].height);
+  for (auto i=0; i<chamber.size(); i++) {
+    if (dbg) printf(" For i=%d, init value is:%s\n", i, chamber[i].c_str());
+    if (bPrintRock && i>=nry && i<nry+rocks[currentRock].height) {
+      if (dbg) printf(" ROCK[%d] in the zone is: %s\n", i-nrx, rocks[currentRock].rockData[i-nry].c_str());
+      // We're in the zone for where the new rock needs drawn in.
+      // Need to take into account BOTH the rock and what's already in the chamber.
+      string line=chamber[i]; // Start with what's in the chamber.
+      for (auto col=0;col<rocks[currentRock].width;col++) {
+        // lay in each non-DOT into the 'line'
+        assert(i-nry >= 0);
+        if (rocks[currentRock].rockData[i-nry][col] != '.')
+          line[nrx+col] = rocks[currentRock].rockData[i-nry][col];
+      }
+
+      printf("|%s|\n", line.c_str());
+    }
+    else
+      printf("|%s|\n", chamber[i].c_str());
+  }
+
+  printf("+-------+\n");
+}
+
+bool day17wouldCollide(int rx, int ry) {
+  bool dbg=false;
+  // Checking to see if this proposed location would hit existing '#' or walls.
+  // first let's check the easy stuff - left/right OOB or bottom of chamber
+  if (!chamber.size() || ry+rocks[currentRock].height>chamber.size())
+    return true;
+
+  if (rx<0 || rx+rocks[currentRock].width>chamber[ry].length())
+    return true;
+  
+  // Now let's step through thr rock data rows
+  for (auto rrow=0; rrow<rocks[currentRock].height; rrow++) {
+    if (dbg) printf("Collision-check: rx:%d, ry:%d, rockrow:%d(%s), chamberrow:%d(%s)\n", rx, ry, rrow, rocks[currentRock].rockData[rrow].c_str(), ry+rrow, chamber[ry+rrow].c_str());
+    for (auto i=0; i<rocks[currentRock].width; i++) {
+      if (rocks[currentRock].rockData[rrow][i] != '.') {
+        // The rock is at this location. What's underneath it in the proposed location?
+        if (chamber[ry+rrow][rx+i] != '.')
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+void day17gasShift(const char dir) {
+  int nx;
+  assert(dir=='<' || dir=='>');
+  if (dir=='<')
+    nx = rockX-1;
+  else
+    nx = rockX+1;
+
+//  printf("GAS blast pushes:%s\n", dir=='>' ? "RIGHT" : "LEFT");
+  if (day17wouldCollide(nx, rockY))
+    return;
+  
+  // No collision - make the move.
+  rockX = nx;
+}
+
+void day17mergeRock() {
+  bool dbg=true;
+  // Checking to see if this proposed location would hit existing '#' or walls.
+  // first let's check the easy stuff - left/right OOB or bottom of chamber
+  assert (chamber.size() && rockY+rocks[currentRock].height<=chamber.size());
+  assert (rockX>=0 && rockX+rocks[currentRock].width<=chamber[rockY].length());
+  
+  // Now let's step through thr rock data rows
+  for (auto rrow=0; rrow<rocks[currentRock].height; rrow++) {
+//    if (dbg) printf("Collision-check: rx:%d, ry:%d, rockrow:%d(%s), chamberrow:%d(%s)\n", rx, ry, rrow, rocks[currentRock].rockData[rrow].c_str(), ry+rrow, chamber[ry+rrow].c_str());
+    for (auto i=0; i<rocks[currentRock].width; i++) {
+      if (rocks[currentRock].rockData[rrow][i] != '.') {
+        // The rock is at this location. Lay it down as '#'
+        chamber[rockY+rrow][rockX+i] = '#';
+      }
+    }
+  }
+}
+
+static bool forceExit=false;
+void day17prepChamber() {
+  int required=3 + rocks[currentRock].height;
+  int additional=-1;
+
+  if (chamber.size() == 0)
+    additional = required;
+
+  for (auto i=0; i<chamber.size(); i++) {
+    if (chamber[i].find('#') != std::string::npos) {
+      additional = required-i;
+      break;
+    }
+  }
+
+  if (additional < 0) {
+    // We have more than we need already.
+    rockY = abs(additional);
+    return;
+  }
+  else
+    rockY=0;
+
+
+//  printf("PREP_CHAMBER: Required:%d, Additional Needed:%d\n", required, additional);
+  while (additional--)
+    chamber.insert(chamber.begin(), ".......");
+}
+
+void day17() {
+  printf("Hello world.\n");
+
+  vector<string> rawInput;
+//  ingestLines("input/day17-sample.input", rawInput);
+  ingestLines("input/day17.input", rawInput);
+
+  int width=rawInput[0].length();
+  int height=rawInput.size();
+
+  int tally=0;
+
+  gasses = rawInput[0];
+
+  // for (int i=0; i<MAXROCKS; i++) {
+  //   printf("Rock %d - width:%d, height:%d\n", i, rocks[i].width, rocks[i].height);
+  //   for (int row=0; row<rocks[i].rockData.size(); row++) {
+  //     vector<string> myRock=rocks[i].rockData;
+  //     printf("%s\n", myRock[row].c_str());
+  //   }
+  // }
+
+//  day17printChamber("PRE-START", rockX, rockY, -1);
+
+  uint64_t rounds=1;
+  while (1) {
+//    printf("BEGINNING new rock:%d at round:%d\n", currentRock, rounds);
+    day17prepChamber();
+    rockX=2;
+// Do *NOT* set rockY here. Let the prep routine do it.    rockY=0;
+
+//    day17printChamber("Pre-Gas", rockX, rockY, rounds);
+
+    day17gasShift(gasses[currentGasEntry++]);
+//    day17printChamber("Post-Gas, Pre-Drop", rockX, rockY, rounds);
+
+    while (!day17wouldCollide(rockX, rockY+1)) {
+      rockY++;
+//      printf("  Pre-GAS during drop, direction=%c, rockX:%d, rockY:%d\n", gasses[currentGasEntry], rockX, rockY);
+      day17gasShift(gasses[currentGasEntry++]);
+      if (currentGasEntry==gasses.length())
+        currentGasEntry = 0;
+//      printf("  Post-GAS during drop, rockX:%d, rockY:%d\n", rockX, rockY);
+//      day17printChamber("Post-Gas, During-Drop", rockX, rockY, rounds);
+    }
+
+    day17mergeRock();
+
+//    day17printChamber("Post-Drop - end of round", rockX, rockY, rounds, false);
+
+//if (rounds==10) exit(0);
+//    if (rounds==2022)
+    if (rounds==50455*2)
+      break;
+    rounds++;
+    if (rounds % 10000 == 0) {
+      printf("Progress: %llu complete.\n", rounds);
+    }
+    
+    currentRock = (currentRock + 1) % MAXROCKS;
+  }
+
+  for (auto i=0; i<chamber.size(); i++) {
+    // Find the first entry that has a '#' in it.
+    if (chamber[i].find('#') != string::npos) {
+      // Answer for part 1: 3048
+      printf("PART 1 - height of rocks after %llu rounds is: %lu\n", rounds, chamber.size()-i);
+      break;
+    }
+  }
+  printf("Final Part 1 Tally: %d\n", tally);
+
+}
+
 int main(int argc, char** argv) {
   printf("Hello world.\n");
 
+  day17();
 //  day24();
   // day20();
 //  day18();
 //  day13();
 }
-
